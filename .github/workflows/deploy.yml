@@ -27,6 +27,8 @@ jobs:
             --exclude='./.env' \
             --exclude='./images/tree.gif' \
             --exclude='./images/birdan.gif' \
+            --exclude='./images/tree-animated-hq.webp' \
+            --exclude='./images/birdan-animated-hq.webp' \
             -czf /tmp/yuva-release.tar.gz .
 
       - name: Configure SSH
