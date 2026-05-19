@@ -98,6 +98,10 @@
         Şifre
         <input name="password" type="password" autocomplete="current-password" required />
       </label>
+      <label>
+        Güvenlik Kodu
+        <input name="totp" inputmode="numeric" pattern="[0-9]{6}" autocomplete="one-time-code" placeholder="2FA aktifse gerekli" />
+      </label>
       <button type="submit">Giriş</button>
     </form>
   </body>

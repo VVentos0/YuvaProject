@@ -68,6 +68,7 @@ MONGODB_URI=mongodb://yuva-root:use-a-long-random-mongo-password@mongo:27017/yuv
 ADMIN_TOKEN=use-a-long-random-secret
 ADMIN_USERNAME=admin
 ADMIN_PASSWORD=use-a-different-long-random-password
+ADMIN_TOTP_SECRET=
 ```
 
 Generate strong secrets on the VDS with:
@@ -75,6 +76,8 @@ Generate strong secrets on the VDS with:
 ```bash
 openssl rand -hex 32
 ```
+
+`ADMIN_TOTP_SECRET` is optional. When it is set to a base32 secret from an authenticator app, the database login requires username, password, and a 6-digit 2FA code. Leave it empty until the owner has saved the secret in an authenticator app.
 
 ## 4. Start app and database
 
@@ -128,7 +131,7 @@ You can also open:
 https://database.yuvarchive.com
 ```
 
-The browser will ask for the `ADMIN_USERNAME` and `ADMIN_PASSWORD` values from `.env`.
+The browser will ask for the `ADMIN_USERNAME` and `ADMIN_PASSWORD` values from `.env`. If `ADMIN_TOTP_SECRET` is set, it will also require the authenticator code.
 
 ## 7. MongoDB Compass
 
