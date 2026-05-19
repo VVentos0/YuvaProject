@@ -1,13 +1,13 @@
 const imageConfig = {
   // Replace these paths with your final assets.
-  mainAnimatedImage: "images/tree.gif",
+  mainAnimatedImage: "images/tree-animated-hq.webp",
   blueSquareImages: [
-    "images/birdan.gif",
-    "images/birdan.gif",
-    "images/birdan.gif",
-    "images/birdan.gif",
-    "images/birdan.gif",
-    "images/birdan.gif",
+    "images/birdan-animated-hq.webp",
+    "images/birdan-animated-hq.webp",
+    "images/birdan-animated-hq.webp",
+    "images/birdan-animated-hq.webp",
+    "images/birdan-animated-hq.webp",
+    "images/birdan-animated-hq.webp",
   ],
   envelopeImages: {
     cream: "images/envelope.png",

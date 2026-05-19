@@ -25,6 +25,8 @@ jobs:
             --exclude='./.git' \
             --exclude='./node_modules' \
             --exclude='./.env' \
+            --exclude='./images/tree.gif' \
+            --exclude='./images/birdan.gif' \
             -czf /tmp/yuva-release.tar.gz .
 
       - name: Configure SSH
