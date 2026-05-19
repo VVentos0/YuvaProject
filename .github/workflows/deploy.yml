@@ -75,7 +75,9 @@ jobs:
           docker builder prune -af --filter "until=24h" || true
 
           for i in $(seq 1 45); do
-            if curl -fsS http://127.0.0.1:3000/api/health; then
+            health="$(curl -fsS --max-time 5 http://127.0.0.1:3000/api/health || true)"
+            echo "$health"
+            if printf '%s' "$health" | grep -q '"db":"connected"'; then
               exit 0
             fi
             sleep 2
