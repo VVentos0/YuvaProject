@@ -713,6 +713,10 @@ app.use(
   }),
 );
 
+app.use("/sounds", (req, res) => {
+  res.status(404).type("text/plain").send("Not found");
+});
+
 app.get("/admin", requireConfiguredAdmin, (req, res) => {
   res.sendFile(path.join(__dirname, "admin.html"));
 });
@@ -728,6 +732,10 @@ app.use(
     maxAge: "30d",
   }),
 );
+
+app.use("/images", (req, res) => {
+  res.status(404).type("text/plain").send("Not found");
+});
 
 app.get("*", (req, res) => {
   res.sendFile(path.join(__dirname, "index.html"));
