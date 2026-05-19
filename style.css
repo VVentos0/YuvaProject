@@ -1382,6 +1382,15 @@ dialog::backdrop {
   color: #ff9f8f;
 }
 
+.letter-honeypot {
+  position: absolute;
+  left: -10000px;
+  top: auto;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+}
+
 .letter-editor input:focus,
 .letter-editor textarea:focus,
 .control-grid select:focus,

@@ -102,6 +102,10 @@
             <label for="letterBody">Mektup</label>
             <textarea id="letterBody" name="letterBody" rows="9" minlength="500" aria-describedby="letterBodyHint" placeholder="Buraya içinden geçenleri yaz..." required></textarea>
             <p class="letter-body-hint" id="letterBodyHint">Minimum 500 karakter yazmalısın.</p>
+            <label class="letter-honeypot" aria-hidden="true" tabindex="-1">
+              Website
+              <input id="letterWebsite" name="website" type="text" tabindex="-1" autocomplete="off" />
+            </label>
 
             <fieldset class="recipient-field">
               <legend>Kime?</legend>

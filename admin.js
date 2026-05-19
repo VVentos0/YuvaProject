@@ -65,6 +65,8 @@ function createLetterElement(letter, ipCount) {
   const cancelButton = document.createElement("button");
   const editButton = document.createElement("button");
   const deleteButton = document.createElement("button");
+  const deleteIpButton = document.createElement("button");
+  const blockIpButton = document.createElement("button");
 
   article.dataset.id = letter.id;
   meta.className = "meta";
@@ -94,6 +96,20 @@ function createLetterElement(letter, ipCount) {
   deleteButton.addEventListener("click", () => deleteLetter(letter));
 
   actions.append(editButton, deleteButton);
+
+  if (letter.ipHash) {
+    deleteIpButton.type = "button";
+    deleteIpButton.className = "danger-button";
+    deleteIpButton.textContent = "Bu IP'yi Temizle";
+    deleteIpButton.addEventListener("click", () => deleteLettersByIp(letter));
+
+    blockIpButton.type = "button";
+    blockIpButton.className = "danger-button";
+    blockIpButton.textContent = "Bu IP'yi Engelle";
+    blockIpButton.addEventListener("click", () => blockIp(letter));
+
+    actions.append(deleteIpButton, blockIpButton);
+  }
 
   authorInput.name = "author";
   authorInput.value = letter.author || "";
@@ -183,6 +199,61 @@ async function deleteLetter(letter) {
   } catch (error) {
     console.error(error);
     statusLabel.textContent = "Silinemedi";
+  }
+}
+
+async function deleteLettersByIp(letter) {
+  const count = allLetters.filter((item) => item.ipHash === letter.ipHash).length;
+
+  if (!window.confirm(`${letter.ipAddress || "Bu IP"} adresinden gelen ${count} mektup silinsin mi?`)) {
+    return;
+  }
+
+  statusLabel.textContent = "Siliniyor...";
+
+  try {
+    const response = await fetch(`/api/admin/letters/by-ip/${encodeURIComponent(letter.ipHash)}`, {
+      method: "DELETE",
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+
+    allLetters = allLetters.filter((item) => item.ipHash !== letter.ipHash);
+    renderLetters();
+    statusLabel.textContent = "IP mektupları silindi";
+  } catch (error) {
+    console.error(error);
+    statusLabel.textContent = "IP mektupları silinemedi";
+  }
+}
+
+async function blockIp(letter) {
+  if (!window.confirm(`${letter.ipAddress || "Bu IP"} bundan sonra mektup gönderemesin mi?`)) {
+    return;
+  }
+
+  statusLabel.textContent = "Engelleniyor...";
+
+  try {
+    const response = await fetch(`/api/admin/blocked-ips/${encodeURIComponent(letter.ipHash)}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        ipAddress: letter.ipAddress || "",
+        reason: "admin panel",
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+
+    statusLabel.textContent = "IP engellendi";
+  } catch (error) {
+    console.error(error);
+    statusLabel.textContent = "IP engellenemedi";
   }
 }
 

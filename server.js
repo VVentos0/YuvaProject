@@ -60,6 +60,9 @@ const PAPER_STYLES = ["warm", "linen", "blue", "rose"];
 const FONT_STYLES = ["modern", "serif", "soft", "pixel", "mono", "hand", "dream"];
 const ENVELOPE_STYLES = ["cream", "rose", "blue", "sage"];
 const MIN_LETTER_BODY_LENGTH = 500;
+const MIN_LETTER_COMPOSE_MS = 5000;
+const DUPLICATE_BODY_WINDOW_MS = 10 * 60 * 1000;
+const DUPLICATE_IP_BODY_WINDOW_MS = 24 * 60 * 60 * 1000;
 
 const letterSchema = new mongoose.Schema(
   {
@@ -76,6 +79,7 @@ const letterSchema = new mongoose.Schema(
     sticker: { type: String, trim: true, maxlength: 120, default: "" },
     ipAddress: { type: String, trim: true, maxlength: 64, default: "" },
     ipHash: { type: String, default: "" },
+    bodyHash: { type: String, default: "" },
   },
   {
     timestamps: true,
@@ -85,8 +89,24 @@ const letterSchema = new mongoose.Schema(
 
 letterSchema.index({ createdAt: -1 });
 letterSchema.index({ recipient: 1, createdAt: -1 });
+letterSchema.index({ bodyHash: 1, createdAt: -1 });
+letterSchema.index({ ipHash: 1, bodyHash: 1, createdAt: -1 });
 
 const Letter = mongoose.model("Letter", letterSchema);
+
+const blockedIpSchema = new mongoose.Schema(
+  {
+    ipHash: { type: String, required: true, unique: true },
+    ipAddress: { type: String, trim: true, maxlength: 64, default: "" },
+    reason: { type: String, trim: true, maxlength: 160, default: "admin" },
+  },
+  {
+    timestamps: true,
+    versionKey: false,
+  },
+);
+
+const BlockedIp = mongoose.model("BlockedIp", blockedIpSchema);
 
 app.set("trust proxy", 1);
 app.use(compression());
@@ -125,6 +145,23 @@ app.use(express.urlencoded({ extended: false }));
 const writeLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   limit: 8,
+  message: { error: "Too many letters, please try again later" },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const writeBurstLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  limit: 3,
+  message: { error: "Too many letters, please slow down" },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const writeHourlyLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  limit: 20,
+  message: { error: "Hourly letter limit reached, please try again later" },
   standardHeaders: true,
   legacyHeaders: false,
 });
@@ -173,6 +210,49 @@ function normalizeLetter(input) {
     envelope: ENVELOPE_STYLES.includes(input.envelope) ? input.envelope : "blue",
     sticker: String(input.sticker || "").trim(),
   };
+}
+
+function normalizeBodyForHash(body) {
+  return String(body || "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLocaleLowerCase("tr-TR");
+}
+
+function hashLetterBody(body) {
+  return crypto.createHash("sha256").update(normalizeBodyForHash(body)).digest("hex");
+}
+
+function getSubmittedAt(input) {
+  const value = Number(input?.submittedAt || 0);
+  return Number.isFinite(value) ? value : 0;
+}
+
+function getFormStartedAt(input) {
+  const value = Number(input?.formStartedAt || 0);
+  return Number.isFinite(value) ? value : 0;
+}
+
+function isHoneypotFilled(input) {
+  return Boolean(String(input?.website || input?.homepage || "").trim());
+}
+
+async function findDuplicateLetter({ bodyHash, ipHash }) {
+  if (!bodyHash) return null;
+
+  const now = Date.now();
+  const sameBodySince = new Date(now - DUPLICATE_BODY_WINDOW_MS);
+  const sameIpBodySince = new Date(now - DUPLICATE_IP_BODY_WINDOW_MS);
+
+  return Letter.findOne({
+    bodyHash,
+    $or: [
+      { createdAt: { $gte: sameBodySince } },
+      { ipHash, createdAt: { $gte: sameIpBodySince } },
+    ],
+  })
+    .select("_id")
+    .lean();
 }
 
 function toPublicLetter(letter) {
@@ -441,10 +521,14 @@ app.get("/api/letters", async (req, res, next) => {
   }
 });
 
-app.post("/api/letters", writeLimiter, async (req, res, next) => {
+app.post("/api/letters", writeBurstLimiter, writeLimiter, writeHourlyLimiter, async (req, res, next) => {
   try {
     const payload = normalizeLetter(req.body);
     const ipAddress = getClientIp(req);
+    const ipHash = hashIp(ipAddress);
+    const bodyHash = hashLetterBody(payload.body);
+    const submittedAt = getSubmittedAt(req.body);
+    const formStartedAt = getFormStartedAt(req.body);
 
     if (!payload.body) {
       res.status(400).json({ error: "Letter body is required" });
@@ -456,10 +540,33 @@ app.post("/api/letters", writeLimiter, async (req, res, next) => {
       return;
     }
 
+    if (isHoneypotFilled(req.body)) {
+      res.status(400).json({ error: "Invalid letter payload" });
+      return;
+    }
+
+    if (formStartedAt && submittedAt && submittedAt - formStartedAt < MIN_LETTER_COMPOSE_MS) {
+      res.status(429).json({ error: "Please spend a little more time before sending" });
+      return;
+    }
+
+    const duplicateLetter = await findDuplicateLetter({ bodyHash, ipHash });
+    if (duplicateLetter) {
+      res.status(409).json({ error: "This letter was already sent recently" });
+      return;
+    }
+
+    const blockedIp = await BlockedIp.findOne({ ipHash }).select("_id").lean();
+    if (blockedIp) {
+      res.status(403).json({ error: "Letter submissions are blocked" });
+      return;
+    }
+
     const letter = await Letter.create({
       ...payload,
       ipAddress,
-      ipHash: hashIp(ipAddress),
+      ipHash,
+      bodyHash,
     });
 
     res.status(201).json(toPublicLetter(letter));
@@ -538,6 +645,51 @@ app.delete("/api/admin/letters/:id", requireConfiguredAdmin, async (req, res, ne
     }
 
     res.status(204).end();
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.delete("/api/admin/letters/by-ip/:ipHash", requireConfiguredAdmin, async (req, res, next) => {
+  try {
+    const ipHash = String(req.params.ipHash || "").trim();
+
+    if (!/^[a-f0-9]{64}$/i.test(ipHash)) {
+      res.status(400).json({ error: "Invalid IP hash" });
+      return;
+    }
+
+    const result = await Letter.deleteMany({ ipHash });
+    res.json({ deletedCount: result.deletedCount || 0 });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/admin/blocked-ips/:ipHash", requireConfiguredAdmin, async (req, res, next) => {
+  try {
+    const ipHash = String(req.params.ipHash || "").trim();
+
+    if (!/^[a-f0-9]{64}$/i.test(ipHash)) {
+      res.status(400).json({ error: "Invalid IP hash" });
+      return;
+    }
+
+    const ipAddress = String(req.body?.ipAddress || "").trim().slice(0, 64);
+    const reason = String(req.body?.reason || "admin").trim().slice(0, 160);
+    const blocked = await BlockedIp.findOneAndUpdate(
+      { ipHash },
+      { $set: { ipHash, ipAddress, reason } },
+      { new: true, upsert: true, setDefaultsOnInsert: true },
+    ).lean();
+
+    res.status(201).json({
+      ipHash: blocked.ipHash,
+      ipAddress: blocked.ipAddress,
+      reason: blocked.reason,
+      createdAt: blocked.createdAt,
+      updatedAt: blocked.updatedAt,
+    });
   } catch (error) {
     next(error);
   }

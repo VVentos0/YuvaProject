@@ -89,6 +89,7 @@ const birdName = document.querySelector("#birdName");
 const anonymousBird = document.querySelector("#anonymousBird");
 const letterBody = document.querySelector("#letterBody");
 const letterBodyHint = document.querySelector("#letterBodyHint");
+const letterWebsite = document.querySelector("#letterWebsite");
 const paperStyle = document.querySelector("#paperStyle");
 const textColor = document.querySelector("#textColor");
 const senderColor = document.querySelector("#senderColor");
@@ -111,6 +112,7 @@ let atmosphereParticles = [];
 let atmosphereFrame;
 let catFrame;
 let catState;
+let letterFormStartedAt = 0;
 let sounds;
 let musicEnabled = true;
 let effectsEnabled = true;
@@ -384,6 +386,8 @@ function bindEvents() {
 
   openLetterModal.addEventListener("click", () => {
     playEffectSound("letterClick");
+    letterFormStartedAt = Date.now();
+    if (letterWebsite) letterWebsite.value = "";
     letterDialog.showModal();
     letterBody.focus();
   });
@@ -445,6 +449,8 @@ function bindEvents() {
 
   resetLetter.addEventListener("click", () => {
     letterForm.reset();
+    letterFormStartedAt = Date.now();
+    if (letterWebsite) letterWebsite.value = "";
     textColor.value = "#2d2926";
     senderColor.value = "#6b4f2a";
     paperStyle.value = "warm";
@@ -907,6 +913,9 @@ async function saveLetter() {
     font: fontStyle.value,
     envelope: envelopeStyle.value,
     sticker: getSelectedSticker(),
+    website: letterWebsite?.value || "",
+    formStartedAt: letterFormStartedAt || Date.now(),
+    submittedAt: Date.now(),
   };
 
   if (!payload.body) {
@@ -939,7 +948,9 @@ async function saveLetter() {
 
     if (!response.ok) {
       const errorBody = await response.json().catch(() => ({}));
-      throw new Error(errorBody.error || `HTTP ${response.status}`);
+      const error = new Error(errorBody.error || `HTTP ${response.status}`);
+      error.status = response.status;
+      throw error;
     }
 
     const savedLetter = await response.json();
@@ -954,6 +965,8 @@ async function saveLetter() {
 
     letterDialog.close();
     letterForm.reset();
+    letterFormStartedAt = 0;
+    if (letterWebsite) letterWebsite.value = "";
     textColor.value = "#2d2926";
     senderColor.value = "#6b4f2a";
     paperStyle.value = "warm";
@@ -965,7 +978,7 @@ async function saveLetter() {
     showToast("Mektubun Yuvaya Ulaştı.");
   } catch (error) {
     console.error("Letter could not be saved to the API.", error);
-    showToast("Mektup Gönderilemedi, Tekrar Dene.");
+    showToast(getLetterSubmitErrorMessage(error));
   } finally {
     setLetterFormBusy(false);
   }
@@ -1176,6 +1189,14 @@ function showToast(message = "Mektubun Yuvaya Ulaştı.") {
   toast.textContent = message;
   toast.classList.add("is-visible");
   toastTimer = window.setTimeout(() => toast.classList.remove("is-visible"), 2600);
+}
+
+function getLetterSubmitErrorMessage(error) {
+  if (error?.status === 409) return "Bu mektup yakın zamanda gönderildi.";
+  if (error?.status === 429) return "Çok hızlı gönderim yapıldı, biraz sonra tekrar dene.";
+  if (String(error?.message || "").includes("500 characters")) return "Minimum 500 Karakter yazmalısın.";
+  if (String(error?.message || "").includes("little more time")) return "Göndermeden önce biraz daha bekle.";
+  return "Mektup Gönderilemedi, Tekrar Dene.";
 }
 
 function setLetterBodyMessage(message, isError = false) {
