@@ -14,7 +14,7 @@
       href="https://fonts.googleapis.com/css2?family=Jersey+15&family=Pixelify+Sans:wght@500;600;700&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="style.css?v=20260519-tree-anchor" />
+    <link rel="stylesheet" href="style.css?v=20260519-letter-warning" />
   </head>
   <body>
     <canvas class="atmosphere-canvas" id="atmosphereCanvas" aria-hidden="true"></canvas>
@@ -22,7 +22,7 @@
       <div class="welcome-content">
         <h1>YUVA</h1>
         <p>
-          <span>Cicikuş ve Pussyland sakinlerinden</span>
+          <span>Kafes ve Pussyland sakinlerinden</span>
           <span>Sedo ve İro’ya…</span>
           <span>İçinizde kalanları ağacın altına bırakın.</span>
         </p>
@@ -100,7 +100,8 @@
         <div class="modal-grid">
           <section class="letter-editor" aria-label="Mektup düzenleyici">
             <label for="letterBody">Mektup</label>
-            <textarea id="letterBody" name="letterBody" rows="9" minlength="500" placeholder="Buraya içinden geçenleri yaz..." required></textarea>
+            <textarea id="letterBody" name="letterBody" rows="9" minlength="500" aria-describedby="letterBodyHint" placeholder="Buraya içinden geçenleri yaz..." required></textarea>
+            <p class="letter-body-hint" id="letterBodyHint">Minimum 500 karakter yazmalısın.</p>
 
             <fieldset class="recipient-field">
               <legend>Kime?</legend>
@@ -271,6 +272,6 @@
       </article>
     </dialog>
 
-    <script src="script.js?v=20260519-welcome-copy"></script>
+    <script src="script.js?v=20260519-letter-warning"></script>
   </body>
 </html>

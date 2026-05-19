@@ -88,6 +88,7 @@ const letterForm = document.querySelector("#letterForm");
 const birdName = document.querySelector("#birdName");
 const anonymousBird = document.querySelector("#anonymousBird");
 const letterBody = document.querySelector("#letterBody");
+const letterBodyHint = document.querySelector("#letterBodyHint");
 const paperStyle = document.querySelector("#paperStyle");
 const textColor = document.querySelector("#textColor");
 const senderColor = document.querySelector("#senderColor");
@@ -424,6 +425,12 @@ function bindEvents() {
   [birdName, anonymousBird, letterBody, paperStyle, textColor, senderColor, fontStyle, envelopeStyle, recipientChoices, paperChoices, envelopeChoices, stickerChoices].forEach((element) => {
     element.addEventListener("input", updatePreview);
     element.addEventListener("change", updatePreview);
+  });
+
+  letterBody.addEventListener("input", () => {
+    if (letterBody.value.trim().length >= 500) {
+      setLetterBodyMessage("Minimum 500 karakter yazmalısın.");
+    }
   });
 
   paperChoices.addEventListener("change", () => {
@@ -903,14 +910,20 @@ async function saveLetter() {
   };
 
   if (!payload.body) {
+    setLetterBodyMessage("Mektup boş olamaz.", true);
     showToast("Mektup Boş Olamaz.");
+    letterBody.focus();
     return;
   }
 
   if (payload.body.length < 500) {
-    showToast("Mektup En Az 500 Karakter Olmalı.");
+    setLetterBodyMessage("Minimum 500 karakter yazmalısın.", true);
+    showToast("Minimum 500 Karakter yazmalısın.");
+    letterBody.focus();
     return;
   }
+
+  setLetterBodyMessage("Minimum 500 karakter yazmalısın.");
 
   setLetterFormBusy(true);
 
@@ -1163,6 +1176,12 @@ function showToast(message = "Mektubun Yuvaya Ulaştı.") {
   toast.textContent = message;
   toast.classList.add("is-visible");
   toastTimer = window.setTimeout(() => toast.classList.remove("is-visible"), 2600);
+}
+
+function setLetterBodyMessage(message, isError = false) {
+  if (!letterBodyHint) return;
+  letterBodyHint.textContent = message;
+  letterBodyHint.classList.toggle("is-error", isError);
 }
 
 function dismissWelcomeScreen() {

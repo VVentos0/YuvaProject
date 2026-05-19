@@ -1248,7 +1248,7 @@ dialog::backdrop {
 
 .letter-editor {
   display: grid;
-  grid-template-rows: auto minmax(220px, 0.9fr) auto auto auto;
+  grid-template-rows: auto minmax(220px, 0.9fr) auto auto auto auto;
   align-content: start;
   gap: 10px;
   min-height: 0;
@@ -1367,6 +1367,19 @@ dialog::backdrop {
   overflow-x: hidden;
   padding: 12px;
   line-height: 1.55;
+}
+
+.letter-body-hint {
+  min-height: 18px;
+  margin: -2px 0 2px;
+  color: rgba(255, 244, 184, 0.72);
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+.letter-body-hint.is-error {
+  color: #ff9f8f;
 }
 
 .letter-editor input:focus,
