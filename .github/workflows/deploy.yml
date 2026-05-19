@@ -29,6 +29,11 @@ jobs:
             --exclude='./images/birdan.gif' \
             --exclude='./images/tree-animated-hq.webp' \
             --exclude='./images/birdan-animated-hq.webp' \
+            --exclude='./images/tree-optimized.webp' \
+            --exclude='./images/birdan-optimized.webp' \
+            --exclude='./images/background.jpg' \
+            --exclude='./images/tree.png' \
+            --exclude='./images/tree-poster.webp' \
             -czf /tmp/yuva-release.tar.gz .
 
       - name: Configure SSH

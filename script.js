@@ -359,7 +359,7 @@ function hydrateImages() {
     img.draggable = false;
 
     window.setTimeout(() => {
-      img.src = withCacheOffset(imageConfig.blueSquareImages[index], index);
+      img.src = imageConfig.blueSquareImages[index];
     }, startDelay);
 
     img.onerror = () => {
@@ -1256,11 +1256,6 @@ function debounce(callback, delay) {
     window.clearTimeout(timer);
     timer = window.setTimeout(() => callback(...args), delay);
   };
-}
-
-function withCacheOffset(path, index) {
-  const separator = path.includes("?") ? "&" : "?";
-  return `${path}${separator}instance=${index}-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
 }
 
 function makeLetterId() {

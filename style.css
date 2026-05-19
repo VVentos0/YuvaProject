@@ -35,7 +35,7 @@ body {
   margin: 0;
   overflow-x: hidden;
   background:
-    url("images/background.jpg") center 43% / cover,
+    url("images/background-optimized.webp") center 43% / cover,
     var(--bg);
   background-repeat: no-repeat;
   color: var(--ink);
