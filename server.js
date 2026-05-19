@@ -21,7 +21,6 @@ const configuredOrigins = (process.env.ALLOWED_ORIGINS || "")
 const adminToken = process.env.ADMIN_TOKEN || "";
 const adminUsername = process.env.ADMIN_USERNAME || "admin";
 const adminPassword = process.env.ADMIN_PASSWORD || "";
-const adminTotpSecret = normalizeBase32(process.env.ADMIN_TOTP_SECRET || "");
 const adminCookieName = "yuva_admin";
 
 const allowedOrigins = new Set([
@@ -339,68 +338,6 @@ function getAdminCookieValue() {
   return crypto.createHmac("sha256", secret).update(`${adminUsername}:${adminPassword}`).digest("hex");
 }
 
-function normalizeBase32(value) {
-  return String(value || "")
-    .replace(/\s+/g, "")
-    .replace(/=+$/g, "")
-    .toUpperCase();
-}
-
-function decodeBase32(value) {
-  const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
-  const normalized = normalizeBase32(value);
-  const bytes = [];
-  let bits = 0;
-  let bitLength = 0;
-
-  for (const char of normalized) {
-    const index = alphabet.indexOf(char);
-    if (index === -1) return null;
-
-    bits = (bits << 5) | index;
-    bitLength += 5;
-
-    if (bitLength >= 8) {
-      bytes.push((bits >> (bitLength - 8)) & 0xff);
-      bitLength -= 8;
-    }
-  }
-
-  return Buffer.from(bytes);
-}
-
-function getTotpCode(secret, timeStep) {
-  const key = decodeBase32(secret);
-  if (!key?.length) return "";
-
-  const counter = Buffer.alloc(8);
-  counter.writeBigUInt64BE(BigInt(timeStep));
-
-  const hmac = crypto.createHmac("sha1", key).update(counter).digest();
-  const offset = hmac[hmac.length - 1] & 0xf;
-  const binary =
-    ((hmac[offset] & 0x7f) << 24) |
-    ((hmac[offset + 1] & 0xff) << 16) |
-    ((hmac[offset + 2] & 0xff) << 8) |
-    (hmac[offset + 3] & 0xff);
-
-  return String(binary % 1000000).padStart(6, "0");
-}
-
-function verifyTotp(secret, token) {
-  const cleanToken = String(token || "").replace(/\s+/g, "");
-  if (!/^\d{6}$/.test(cleanToken)) return false;
-
-  const currentStep = Math.floor(Date.now() / 30000);
-  for (let offset = -1; offset <= 1; offset += 1) {
-    if (safeEqual(cleanToken, getTotpCode(secret, currentStep + offset))) {
-      return true;
-    }
-  }
-
-  return false;
-}
-
 function isAdminAuthorized(req) {
   const authorization = req.get("authorization") || "";
   const cookies = parseCookies(req);
@@ -410,7 +347,7 @@ function isAdminAuthorized(req) {
     return true;
   }
 
-  if (!adminTotpSecret && authorization.startsWith("Basic ")) {
+  if (authorization.startsWith("Basic ")) {
     const decoded = Buffer.from(authorization.slice(6), "base64").toString("utf8");
     const separatorIndex = decoded.indexOf(":");
 
@@ -473,14 +410,8 @@ function routeDatabaseHost(req, res, next) {
     loginLimiter(req, res, () => {
       const username = String(req.body.username || "");
       const password = String(req.body.password || "");
-      const totp = String(req.body.totp || "");
 
-      if (
-        !adminPassword ||
-        !safeEqual(username, adminUsername) ||
-        !safeEqual(password, adminPassword) ||
-        (adminTotpSecret && !verifyTotp(adminTotpSecret, totp))
-      ) {
+      if (!adminPassword || !safeEqual(username, adminUsername) || !safeEqual(password, adminPassword)) {
         res.status(401).sendFile(path.join(__dirname, "login.html"));
         return;
       }
