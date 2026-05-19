@@ -1,0 +1,276 @@
+<!doctype html>
+<html lang="tr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>YUVA</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@500;700;800&family=Playfair+Display:wght@600&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Jersey+15&family=Pixelify+Sans:wght@500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="style.css?v=20260519-tree-anchor" />
+  </head>
+  <body>
+    <canvas class="atmosphere-canvas" id="atmosphereCanvas" aria-hidden="true"></canvas>
+    <section class="welcome-screen" id="welcomeScreen" aria-label="YUVA giriş mesajı">
+      <div class="welcome-content">
+        <h1>YUVA</h1>
+        <p>
+          <span>Cicikuş ve Pussyland sakinlerinden</span>
+          <span>Sedo ve İro’ya…</span>
+          <span>İçinizde kalanları ağacın altına bırakın.</span>
+        </p>
+        <button class="welcome-enter" id="welcomeEnter" type="button" aria-label="YUVA'ya gir">
+          <img src="images/sticker1.avif" alt="" />
+        </button>
+      </div>
+    </section>
+    <div class="page-shell">
+      <div class="corner-home-wrap">
+        <button class="corner-label corner-label--left corner-home" id="refreshHome" type="button" aria-label="Sayfayı yenile">YUVA</button>
+        <div class="corner-home-menu" aria-label="YUVA menüsü">
+          <div class="corner-info-box">
+            <button id="aboutYuvaOpen" type="button">Nedir?</button>
+          </div>
+          <div class="corner-audio-menu" aria-label="Ses kontrolleri">
+            <button class="corner-audio-toggle is-on" id="musicToggle" type="button" aria-pressed="true"><img class="audio-icon" src="images/note.png" alt="" aria-hidden="true" />Müzik</button>
+            <button class="corner-audio-toggle is-on" id="soundToggle" type="button" aria-pressed="true"><img class="audio-icon" src="images/speaker.png" alt="" aria-hidden="true" />Sesler</button>
+          </div>
+        </div>
+      </div>
+      <div class="corner-label corner-label--right" id="letterCountLabel" aria-label="Gönderilen mektup sayısı"></div>
+
+      <main class="yuva-stage" aria-label="YUVA dijital anı alanı">
+        <section class="main-image-area safe-zone" aria-label="Ana anı görseli">
+          <img class="main-tree-base" id="mainAnimatedImage" alt="Ana anı görseli" />
+          <div class="main-tree-breath-layer" aria-hidden="true">
+            <img id="mainAnimatedTopImage" alt="" />
+          </div>
+        </section>
+
+        <section class="envelope-garden" id="envelopeGarden" aria-label="Yuvaya ulaşan zarflar"></section>
+
+        <button class="ribbon-hotspot" id="ribbonHotspot" type="button" aria-label="Kurdele notunu oku"></button>
+        <button class="ornament-hotspot ornament-hotspot--star" id="starHotspot" type="button" aria-label="Yıldız notunu oku"></button>
+        <button class="ornament-hotspot ornament-hotspot--cd" id="cdHotspot" type="button" aria-label="CD notunu oku"></button>
+
+        <section class="memory-orbit" aria-label="Dağınık anı görselleri">
+          <div class="blue-square" tabindex="0"><img alt="Anı görseli 1" /></div>
+          <div class="blue-square" tabindex="0"><img alt="Anı görseli 2" /></div>
+          <div class="blue-square" tabindex="0"><img alt="Anı görseli 3" /></div>
+          <div class="blue-square" tabindex="0"><img alt="Anı görseli 4" /></div>
+          <div class="blue-square" tabindex="0"><img alt="Anı görseli 5" /></div>
+          <div class="blue-square" tabindex="0"><img alt="Anı görseli 6" /></div>
+        </section>
+
+        <button class="write-button safe-zone" id="openLetterModal" type="button" aria-label="Mektup Yaz">
+          <span>Mektup Yaz</span>
+        </button>
+      </main>
+
+      <footer class="corner-label corner-label--bottom-left">by Hyle &amp; VVentos</footer>
+      <time class="corner-label corner-label--bottom-right" id="liveDateTime" datetime=""></time>
+    </div>
+
+    <img class="scene-sign" src="images/sign.png" alt="" aria-hidden="true" />
+
+    <button class="roaming-cat" id="roamingCat" type="button" aria-label="Sayfada gezen beyaz kedi">
+      <span class="cat-shadow" aria-hidden="true"></span>
+      <img class="cat-sprite" id="catSprite" src="images/catwalking.gif" alt="" draggable="false" />
+    </button>
+
+    <div class="toast" id="toast" role="status" aria-live="polite">Mektubun Yuvaya Ulaştı.</div>
+
+    <dialog class="letter-dialog" id="letterDialog" aria-labelledby="letterDialogTitle">
+      <form class="letter-modal" id="letterForm" method="dialog" novalidate>
+        <div class="modal-head">
+          <div>
+            <p class="modal-kicker">Yuvaya Bırak</p>
+            <h1 id="letterDialogTitle">Yeni Mektup</h1>
+          </div>
+          <button class="icon-button" id="closeLetterModal" type="button" aria-label="Kapat">×</button>
+        </div>
+
+        <div class="modal-grid">
+          <section class="letter-editor" aria-label="Mektup düzenleyici">
+            <label for="letterBody">Mektup</label>
+            <textarea id="letterBody" name="letterBody" rows="9" minlength="500" placeholder="Buraya içinden geçenleri yaz..." required></textarea>
+
+            <fieldset class="recipient-field">
+              <legend>Kime?</legend>
+              <div class="recipient-row" id="recipientChoices">
+                <label><input type="radio" name="recipient" value="SEDO" checked /><span>SEDO</span></label>
+                <label><input type="radio" name="recipient" value="IRO" /><span>IRO</span></label>
+              </div>
+            </fieldset>
+
+            <div class="name-row">
+              <label for="birdName">
+                Cicikuş İsmi
+                <input id="birdName" name="birdName" type="text" maxlength="48" placeholder="İsmini bırak..." />
+              </label>
+              <label class="anon-option" for="anonymousBird">
+                <input id="anonymousBird" name="anonymousBird" type="checkbox" />
+                <span aria-hidden="true"></span>
+                Anonim Kuş
+              </label>
+            </div>
+
+            <div class="control-grid">
+              <label class="hidden-option-label">
+                Kağıt
+                <select class="hidden-control" id="paperStyle" name="paperStyle" aria-hidden="true" tabindex="-1">
+                  <option value="warm">Sıcak</option>
+                  <option value="linen">Keten</option>
+                  <option value="blue">Soluk Mavi</option>
+                  <option value="rose">Gül</option>
+                </select>
+              </label>
+
+              <label>
+                Yazı Rengi
+                <input id="textColor" name="textColor" type="color" value="#2d2926" />
+              </label>
+
+              <label>
+                Cicikuş Rengi
+                <input id="senderColor" name="senderColor" type="color" value="#6b4f2a" />
+              </label>
+
+              <label>
+                Font
+                <select id="fontStyle" name="fontStyle">
+                  <option value="modern">Modern</option>
+                  <option value="serif">Serif</option>
+                  <option value="soft">Yumuşak</option>
+                  <option value="pixel">Piksel</option>
+                  <option value="mono">Daktilo</option>
+                  <option value="hand">El yazısı</option>
+                  <option value="dream">Rüya</option>
+                </select>
+              </label>
+
+              <label class="hidden-option-label">
+                Zarf Rengi
+                <select class="hidden-control" id="envelopeStyle" name="envelopeStyle" aria-hidden="true" tabindex="-1">
+                  <option value="blue">Sarı</option>
+                  <option value="sage">Yeşil</option>
+                  <option value="rose">Pembe</option>
+                  <option value="cream">Mor</option>
+                </select>
+              </label>
+
+              <fieldset class="sticker-field">
+                <legend>Sticker</legend>
+                <div class="sticker-row" id="stickerChoices">
+                  <label><input type="radio" name="sticker" value="" checked /><span>boş</span></label>
+                  <label><input type="radio" name="sticker" value="images/sticker1.avif" /><span><img src="images/sticker1.avif" alt="Sticker 1" /></span></label>
+                  <label><input type="radio" name="sticker" value="images/sticker2.avif" /><span><img src="images/sticker2.avif" alt="Sticker 2" /></span></label>
+                  <label><input type="radio" name="sticker" value="images/sticker3.avif" /><span><img src="images/sticker3.avif" alt="Sticker 3" /></span></label>
+                  <label><input type="radio" name="sticker" value="images/sticker4.avif" /><span><img src="images/sticker4.avif" alt="Sticker 4" /></span></label>
+                  <label><input type="radio" name="sticker" value="images/sticker5.avif" /><span><img src="images/sticker5.avif" alt="Sticker 5" /></span></label>
+                  <label><input type="radio" name="sticker" value="images/sticker6.avif" /><span><img src="images/sticker6.avif" alt="Sticker 6" /></span></label>
+                  <label><input type="radio" name="sticker" value="images/sticker7.avif" /><span><img src="images/sticker7.avif" alt="Sticker 7" /></span></label>
+                  <label><input type="radio" name="sticker" value="images/sticker8.avif" /><span><img src="images/sticker8.avif" alt="Sticker 8" /></span></label>
+                  <label><input type="radio" name="sticker" value="images/sticker9.avif" /><span><img src="images/sticker9.avif" alt="Sticker 9" /></span></label>
+                  <label><input type="radio" name="sticker" value="images/sticker10.avif" /><span><img src="images/sticker10.avif" alt="Sticker 10" /></span></label>
+                  <label><input type="radio" name="sticker" value="images/sticker11.avif" /><span><img src="images/sticker11.avif" alt="Sticker 11" /></span></label>
+                  <label><input type="radio" name="sticker" value="images/sticker12.avif" /><span><img src="images/sticker12.avif" alt="Sticker 12" /></span></label>
+                  <label><input type="radio" name="sticker" value="images/sticker13.avif" /><span><img src="images/sticker13.avif" alt="Sticker 13" /></span></label>
+                </div>
+              </fieldset>
+            </div>
+          </section>
+
+          <section class="letter-preview-wrap" aria-label="Canlı Önizleme">
+            <div class="visual-options" aria-label="Görsel Seçimler">
+              <fieldset class="visual-field">
+                <legend>Kağıt</legend>
+                <div class="paper-choice-grid" id="paperChoices">
+                  <label class="paper-choice paper-warm"><input type="radio" name="paperChoice" value="warm" checked /><span>Sıcak</span></label>
+                  <label class="paper-choice paper-linen"><input type="radio" name="paperChoice" value="linen" /><span>Keten</span></label>
+                  <label class="paper-choice paper-blue"><input type="radio" name="paperChoice" value="blue" /><span>Mavi</span></label>
+                  <label class="paper-choice paper-rose"><input type="radio" name="paperChoice" value="rose" /><span>Gül</span></label>
+                </div>
+              </fieldset>
+
+              <fieldset class="visual-field">
+                <legend>Zarf Rengi</legend>
+                <div class="envelope-choice-grid" id="envelopeChoices">
+                  <label class="envelope-choice envelope-choice--blue"><input type="radio" name="envelopeChoice" value="blue" checked /><span>Sarı</span></label>
+                  <label class="envelope-choice envelope-choice--sage"><input type="radio" name="envelopeChoice" value="sage" /><span>Yeşil</span></label>
+                  <label class="envelope-choice envelope-choice--rose"><input type="radio" name="envelopeChoice" value="rose" /><span>Pembe</span></label>
+                  <label class="envelope-choice envelope-choice--cream"><input type="radio" name="envelopeChoice" value="cream" /><span>Mor</span></label>
+                </div>
+              </fieldset>
+            </div>
+
+            <article class="letter-preview paper-warm" id="letterPreview">
+              <span class="preview-sticker" id="previewSticker"></span>
+              <p id="previewBody">Buraya içinden geçenleri yaz...</p>
+              <p class="preview-signature" id="previewSignature"></p>
+            </article>
+          </section>
+        </div>
+
+        <div class="modal-actions">
+          <button class="ghost-button" id="resetLetter" type="button">Temizle</button>
+          <button class="send-button" type="submit">Gönder</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog class="ribbon-dialog" id="ribbonDialog" aria-labelledby="ribbonDialogTitle">
+      <article class="ribbon-note">
+        <button class="ribbon-note-close" id="closeRibbonDialog" type="button" aria-label="Kapat">×</button>
+        <img class="ribbon-note-image" src="images/rib.png" alt="" />
+        <h2 id="ribbonDialogTitle">Bir Kurdele</h2>
+        <p>Bir sever, bu zarif kurdelesini ağaca bağlamış. "Hep aklımdasınız.." diye not düşmüş.</p>
+      </article>
+    </dialog>
+
+    <dialog class="ribbon-dialog" id="starDialog" aria-labelledby="starDialogTitle">
+      <article class="ribbon-note">
+        <button class="ribbon-note-close" id="closeStarDialog" type="button" aria-label="Kapat">×</button>
+        <img class="ribbon-note-image" src="images/starr2.png" alt="" />
+        <h2 id="starDialogTitle">Küçük Bir Yıldız.</h2>
+        <p>"Artık seni göremesek de ışığınız hala burada." yazıyor.</p>
+      </article>
+    </dialog>
+
+    <dialog class="ribbon-dialog" id="cdDialog" aria-labelledby="cdDialogTitle">
+      <article class="ribbon-note">
+        <button class="ribbon-note-close" id="closeCdDialog" type="button" aria-label="Kapat">×</button>
+        <img class="ribbon-note-image" src="images/disc.png" alt="" />
+        <h2 id="cdDialogTitle">Bir CD</h2>
+        <p>Üzerinde "en samimi anlar" yazıyor. Kimin bıraktığını bilmiyoruz.</p>
+      </article>
+    </dialog>
+
+    <dialog class="ribbon-dialog" id="aboutYuvaDialog" aria-labelledby="aboutYuvaTitle">
+      <article class="ribbon-note ribbon-note--wide">
+        <button class="ribbon-note-close" id="closeAboutYuvaDialog" type="button" aria-label="Kapat">×</button>
+        <h2 id="aboutYuvaTitle">Nedir?</h2>
+        <p>YUVA, Cicikuşlar topluluğu tarafından Sedo ve İro etrafında yaşayan dijital bir anı alanı oluşturmak amacıyla hazırlanmış interaktif bir projedir. Bu proje topluluğun bir arada kalmasını, insanların düşüncelerini paylaşabilmesini ve zaman içerisinde büyüyen ortak bir arşiv oluşmasını amaçlar.</p>
+        <p>Burada bırakılan her mektup ağacın altında birikir ve YUVA’nın bir parçası hâline gelir. Zaman geçtikçe yeni mektuplar, anılar ve hediyeler eklenir; böylece topluluğun bıraktığı iz yaşamaya devam eder. YUVA yalnızca bir mesaj sayfası değil, topluluğun birlikte şekillendirdiği yaşayan bir dijital deneyimdir.</p>
+        <p>Eğer siz de bir iz bırakmak istiyorsanız, ağacın altına kendi mektubunuzu bırakabilirsiniz.</p>
+      </article>
+    </dialog>
+
+    <dialog class="ribbon-dialog" id="envelopeLockedDialog" aria-labelledby="envelopeLockedTitle">
+      <article class="ribbon-note ribbon-note--small">
+        <button class="ribbon-note-close" id="closeEnvelopeLockedDialog" type="button" aria-label="Kapat">×</button>
+        <h2 id="envelopeLockedTitle">Çok ayıp!</h2>
+        <p>Sadece Sedo ve Iro okuyabilir.</p>
+      </article>
+    </dialog>
+
+    <script src="script.js?v=20260519-welcome-copy"></script>
+  </body>
+</html>

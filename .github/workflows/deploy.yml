@@ -1,0 +1,87 @@
+name: Deploy to VDS
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: yuva-production
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Pack release
+        run: |
+          tar \
+            --exclude='./.git' \
+            --exclude='./node_modules' \
+            --exclude='./.env' \
+            -czf /tmp/yuva-release.tar.gz .
+
+      - name: Configure SSH
+        env:
+          VDS_SSH_KEY: ${{ secrets.VDS_SSH_KEY }}
+          VDS_HOST: ${{ secrets.VDS_HOST }}
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "$VDS_SSH_KEY" > ~/.ssh/yuva_deploy
+          chmod 600 ~/.ssh/yuva_deploy
+          ssh-keyscan -H "$VDS_HOST" >> ~/.ssh/known_hosts
+
+      - name: Upload release
+        env:
+          VDS_HOST: ${{ secrets.VDS_HOST }}
+          VDS_USER: ${{ secrets.VDS_USER }}
+          VDS_PORT: ${{ secrets.VDS_PORT }}
+        run: |
+          scp -P "${VDS_PORT:-22}" -i ~/.ssh/yuva_deploy /tmp/yuva-release.tar.gz \
+            "$VDS_USER@$VDS_HOST:/home/admin/yuva-release.tar.gz"
+
+      - name: Deploy on VDS
+        env:
+          VDS_HOST: ${{ secrets.VDS_HOST }}
+          VDS_USER: ${{ secrets.VDS_USER }}
+          VDS_PORT: ${{ secrets.VDS_PORT }}
+        run: |
+          ssh -p "${VDS_PORT:-22}" -i ~/.ssh/yuva_deploy "$VDS_USER@$VDS_HOST" <<'REMOTE'
+          set -euo pipefail
+
+          PROJECT_DIR="/home/admin/YuvaProject"
+          RELEASE_ARCHIVE="/home/admin/yuva-release.tar.gz"
+
+          mkdir -p "$PROJECT_DIR"
+          cd "$PROJECT_DIR"
+
+          if [ ! -f .env ]; then
+            echo "Missing $PROJECT_DIR/.env on VDS. Refusing to deploy without production env." >&2
+            exit 1
+          fi
+
+          find "$PROJECT_DIR" -mindepth 1 -maxdepth 1 ! -name ".env" -exec rm -rf {} +
+          tar -xzf "$RELEASE_ARCHIVE" -C "$PROJECT_DIR"
+          rm -f "$RELEASE_ARCHIVE"
+
+          docker compose up -d --build
+          docker builder prune -af --filter "until=24h" || true
+
+          for i in $(seq 1 45); do
+            if curl -fsS http://127.0.0.1:3000/api/health; then
+              exit 0
+            fi
+            sleep 2
+          done
+
+          docker compose ps
+          docker compose logs --tail=80 app
+          exit 1
+          REMOTE

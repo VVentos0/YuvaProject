@@ -1,0 +1,6 @@
+node_modules
+.env
+.git
+npm-debug.log*
+images/tree-optimized.webp
+images/birdan-optimized.webp
