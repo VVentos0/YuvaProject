@@ -56,6 +56,7 @@ const mainImage = document.querySelector("#mainAnimatedImage");
 const mainTopImage = document.querySelector("#mainAnimatedTopImage");
 const mainImageArea = document.querySelector(".main-image-area");
 const atmosphereCanvas = document.querySelector("#atmosphereCanvas");
+const shootingStarLayer = document.querySelector("#shootingStarLayer");
 const welcomeScreen = document.querySelector("#welcomeScreen");
 const welcomeEnter = document.querySelector("#welcomeEnter");
 const refreshHome = document.querySelector("#refreshHome");
@@ -77,6 +78,8 @@ const cdHotspot = document.querySelector("#cdHotspot");
 const cdDialog = document.querySelector("#cdDialog");
 const aboutYuvaDialog = document.querySelector("#aboutYuvaDialog");
 const envelopeLockedDialog = document.querySelector("#envelopeLockedDialog");
+const wishIntroDialog = document.querySelector("#wishIntroDialog");
+const wishFormDialog = document.querySelector("#wishFormDialog");
 const openLetterModal = document.querySelector("#openLetterModal");
 const closeLetterModal = document.querySelector("#closeLetterModal");
 const closeRibbonDialog = document.querySelector("#closeRibbonDialog");
@@ -84,6 +87,13 @@ const closeStarDialog = document.querySelector("#closeStarDialog");
 const closeCdDialog = document.querySelector("#closeCdDialog");
 const closeAboutYuvaDialog = document.querySelector("#closeAboutYuvaDialog");
 const closeEnvelopeLockedDialog = document.querySelector("#closeEnvelopeLockedDialog");
+const closeWishIntroDialog = document.querySelector("#closeWishIntroDialog");
+const dismissWishIntroDialog = document.querySelector("#dismissWishIntroDialog");
+const openWishFormDialog = document.querySelector("#openWishFormDialog");
+const closeWishFormDialog = document.querySelector("#closeWishFormDialog");
+const dismissWishFormDialog = document.querySelector("#dismissWishFormDialog");
+const wishForm = document.querySelector("#wishForm");
+const wishText = document.querySelector("#wishText");
 const letterForm = document.querySelector("#letterForm");
 const birdName = document.querySelector("#birdName");
 const anonymousBird = document.querySelector("#anonymousBird");
@@ -110,6 +120,8 @@ const sendButton = letterForm?.querySelector(".send-button");
 let toastTimer;
 let atmosphereParticles = [];
 let atmosphereFrame;
+let shootingStarTimer;
+let activeShootingStar = null;
 let catFrame;
 let catState;
 let letterFormStartedAt = 0;
@@ -122,6 +134,7 @@ function init() {
   initSounds();
   hydrateImages();
   initAtmosphere();
+  initShootingStars();
   updateDateTime();
   setInterval(updateDateTime, 1000);
   updatePreview();
@@ -342,6 +355,183 @@ function initAtmosphere() {
   draw();
 }
 
+function initShootingStars() {
+  if (!shootingStarLayer) return;
+
+  const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  if (reducedMotion) return;
+
+  document.addEventListener("pointerdown", handleShootingStarPointerDown, true);
+  window.spawnYuvaShootingStar = spawnShootingStar;
+  scheduleNextShootingStar(9000, 18000);
+}
+
+function handleShootingStarPointerDown(event) {
+  if (!activeShootingStar?.point) return;
+  if (event.target?.closest?.("dialog")) return;
+
+  const dx = event.clientX - activeShootingStar.point.x;
+  const dy = event.clientY - activeShootingStar.point.y;
+  const hitRadius = activeShootingStar.hitRadius || 34;
+
+  if (Math.hypot(dx, dy) > hitRadius) return;
+
+  event.preventDefault();
+  event.stopPropagation();
+  openWishIntroFromShootingStar();
+}
+
+function scheduleNextShootingStar(minDelay = 45000, maxDelay = 90000) {
+  window.clearTimeout(shootingStarTimer);
+  shootingStarTimer = window.setTimeout(() => {
+    if (welcomeScreen && !welcomeScreen.classList.contains("is-hidden")) {
+      scheduleNextShootingStar(6000, 12000);
+      return;
+    }
+
+    spawnShootingStar();
+    scheduleNextShootingStar();
+  }, randomBetween(minDelay, maxDelay));
+}
+
+function spawnShootingStar() {
+  if (!shootingStarLayer || activeShootingStar) return;
+
+  shootingStarLayer.setAttribute("aria-hidden", "false");
+
+  const width = window.innerWidth;
+  const height = window.innerHeight;
+  const fromLeft = Math.random() > 0.5;
+  const startX = fromLeft ? -48 : width + 48;
+  const endX = fromLeft ? width * randomBetween(0.66, 0.92) : width * randomBetween(0.08, 0.34);
+  const startY = height * randomBetween(0.1, 0.2);
+  const endY = height * randomBetween(0.24, 0.35);
+  const controlX = fromLeft ? width * randomBetween(0.22, 0.45) : width * randomBetween(0.55, 0.78);
+  const controlY = height * randomBetween(0.1, 0.16);
+  const pathData = `M ${startX} ${startY} Q ${controlX} ${controlY} ${endX} ${endY}`;
+  const duration = randomBetween(7000, 10000);
+  const trailLength = Math.min(width * 0.22, 300);
+
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.classList.add("shooting-star-svg");
+  svg.setAttribute("aria-hidden", "true");
+  svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
+  svg.setAttribute("preserveAspectRatio", "none");
+
+  const defs = document.createElementNS("http://www.w3.org/2000/svg", "defs");
+  const gradient = document.createElementNS("http://www.w3.org/2000/svg", "linearGradient");
+  gradient.setAttribute("id", "shootingStarTrailGradient");
+  gradient.setAttribute("gradientUnits", "userSpaceOnUse");
+  gradient.setAttribute("x1", String(startX));
+  gradient.setAttribute("y1", String(startY));
+  gradient.setAttribute("x2", String(endX));
+  gradient.setAttribute("y2", String(endY));
+  [
+    ["0%", "rgba(255, 205, 85, 0)"],
+    ["55%", "rgba(255, 223, 118, 0.28)"],
+    ["100%", "rgba(255, 244, 184, 0.88)"],
+  ].forEach(([offset, color]) => {
+    const stop = document.createElementNS("http://www.w3.org/2000/svg", "stop");
+    stop.setAttribute("offset", offset);
+    stop.setAttribute("stop-color", color);
+    gradient.appendChild(stop);
+  });
+  defs.appendChild(gradient);
+  svg.appendChild(defs);
+
+  const trail = document.createElementNS("http://www.w3.org/2000/svg", "path");
+  trail.classList.add("shooting-star-trail");
+  trail.setAttribute("d", pathData);
+  trail.setAttribute("stroke", "url(#shootingStarTrailGradient)");
+  svg.appendChild(trail);
+
+  const star = document.createElement("button");
+  star.className = "shooting-star";
+  star.type = "button";
+  star.setAttribute("aria-label", "Kayan yildiza dilek tut");
+  star.innerHTML = '<span class="shooting-star-core" aria-hidden="true"></span>';
+
+  shootingStarLayer.append(svg, star);
+
+  const totalLength = trail.getTotalLength();
+  const startedAt = performance.now();
+  let lastParticleAt = 0;
+  let frame;
+
+  function clearStar() {
+    window.cancelAnimationFrame(frame);
+    star.remove();
+    svg.remove();
+    activeShootingStar = null;
+    shootingStarLayer.setAttribute("aria-hidden", "true");
+  }
+
+  function tick(now) {
+    const elapsed = now - startedAt;
+    const progress = Math.min(elapsed / duration, 1);
+    const eased = easeInOutSine(progress);
+    const distance = totalLength * eased;
+    const point = trail.getPointAtLength(distance);
+    const prevPoint = trail.getPointAtLength(Math.max(0, distance - 4));
+    const angle = Math.atan2(point.y - prevPoint.y, point.x - prevPoint.x) * (180 / Math.PI);
+
+    if (activeShootingStar) {
+      activeShootingStar.point = { x: point.x, y: point.y };
+      activeShootingStar.hitRadius = Math.max(34, Math.min(48, width * 0.035));
+    }
+
+    star.style.transform = `translate3d(${point.x}px, ${point.y}px, 0) translate(-50%, -50%) rotate(${angle}deg)`;
+    trail.style.strokeDasharray = `${trailLength} ${totalLength}`;
+    trail.style.strokeDashoffset = String(trailLength - distance);
+    trail.style.opacity = String(progress > 0.82 ? Math.max(0, (1 - progress) / 0.18) : 1);
+
+    if (now - lastParticleAt > 280 && progress > 0.08 && progress < 0.92) {
+      createShootingStarParticle(point.x, point.y);
+      lastParticleAt = now;
+    }
+
+    if (progress < 1) {
+      frame = window.requestAnimationFrame(tick);
+    } else {
+      star.classList.add("is-fading");
+      window.setTimeout(clearStar, 620);
+    }
+  }
+
+  star.addEventListener("click", () => {
+    openWishIntroFromShootingStar();
+  });
+
+  activeShootingStar = { clear: clearStar, hitRadius: 38, point: { x: startX, y: startY } };
+  frame = window.requestAnimationFrame(tick);
+}
+
+function openWishIntroFromShootingStar() {
+  if (wishIntroDialog && !wishIntroDialog.open) {
+    wishIntroDialog.showModal();
+    openWishFormDialog?.focus();
+  }
+
+  activeShootingStar?.clear();
+}
+
+function createShootingStarParticle(x, y) {
+  if (!shootingStarLayer) return;
+
+  const particle = document.createElement("span");
+  particle.className = "shooting-star-particle";
+  particle.style.left = `${x + randomBetween(-5, 5)}px`;
+  particle.style.top = `${y + randomBetween(-4, 4)}px`;
+  particle.style.setProperty("--particle-drift-x", `${randomBetween(-8, 6)}px`);
+  particle.style.setProperty("--particle-drift-y", `${randomBetween(4, 14)}px`);
+  shootingStarLayer.appendChild(particle);
+  particle.addEventListener("animationend", () => particle.remove(), { once: true });
+}
+
+function easeInOutSine(value) {
+  return -(Math.cos(Math.PI * value) - 1) / 2;
+}
+
 function hydrateImages() {
   mainImage.src = imageConfig.mainAnimatedImage;
   mainTopImage.src = imageConfig.mainAnimatedImage;
@@ -383,6 +573,21 @@ function bindEvents() {
   soundToggle.addEventListener("click", toggleEffects);
   closeAboutYuvaDialog.addEventListener("click", () => aboutYuvaDialog.close());
   closeEnvelopeLockedDialog.addEventListener("click", () => envelopeLockedDialog.close());
+  closeWishIntroDialog?.addEventListener("click", () => wishIntroDialog.close());
+  dismissWishIntroDialog?.addEventListener("click", () => wishIntroDialog.close());
+  openWishFormDialog?.addEventListener("click", () => {
+    wishIntroDialog.close();
+    wishFormDialog.showModal();
+    wishText?.focus();
+  });
+  closeWishFormDialog?.addEventListener("click", () => wishFormDialog.close());
+  dismissWishFormDialog?.addEventListener("click", () => wishFormDialog.close());
+  wishForm?.addEventListener("submit", (event) => {
+    event.preventDefault();
+    wishFormDialog.close();
+    wishForm.reset();
+    showToast("Dileğin gökyüzünde kaldı.");
+  });
 
   openLetterModal.addEventListener("click", () => {
     playEffectSound("letterClick");
@@ -418,7 +623,8 @@ function bindEvents() {
   });
   closeCdDialog.addEventListener("click", () => cdDialog.close());
 
-  [ribbonDialog, starDialog, cdDialog, aboutYuvaDialog, envelopeLockedDialog].forEach((dialog) => {
+  [ribbonDialog, starDialog, cdDialog, aboutYuvaDialog, envelopeLockedDialog, wishIntroDialog, wishFormDialog].forEach((dialog) => {
+    if (!dialog) return;
     dialog.addEventListener("click", (event) => {
       if (event.target === dialog) {
         dialog.close();
@@ -473,6 +679,8 @@ function bindEvents() {
       if (cdDialog.open) cdDialog.close();
       if (aboutYuvaDialog.open) aboutYuvaDialog.close();
       if (envelopeLockedDialog.open) envelopeLockedDialog.close();
+      if (wishIntroDialog?.open) wishIntroDialog.close();
+      if (wishFormDialog?.open) wishFormDialog.close();
     }
   });
 }
@@ -1218,6 +1426,7 @@ function dismissWelcomeScreen() {
     welcomeScreen.classList.add("is-leaving");
     welcomeScreen.addEventListener("animationend", removeWelcome, { once: true });
     window.setTimeout(removeWelcome, 1400);
+    scheduleNextShootingStar(5000, 11000);
   };
 
   welcomeEnter?.addEventListener("click", beginExit, { once: true });
