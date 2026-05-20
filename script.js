@@ -363,7 +363,7 @@ function initShootingStars() {
 
   document.addEventListener("pointerdown", handleShootingStarPointerDown, true);
   window.spawnYuvaShootingStar = spawnShootingStar;
-  scheduleNextShootingStar(9000, 18000);
+  scheduleNextShootingStar(6000, 12000);
 }
 
 function handleShootingStarPointerDown(event) {
@@ -1426,7 +1426,7 @@ function dismissWelcomeScreen() {
     welcomeScreen.classList.add("is-leaving");
     welcomeScreen.addEventListener("animationend", removeWelcome, { once: true });
     window.setTimeout(removeWelcome, 1400);
-    scheduleNextShootingStar(5000, 11000);
+    scheduleNextShootingStar(1800, 3600);
   };
 
   welcomeEnter?.addEventListener("click", beginExit, { once: true });
