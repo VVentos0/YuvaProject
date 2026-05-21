@@ -1,6 +1,8 @@
 const imageConfig = {
   // Replace these paths with your final assets.
   mainAnimatedImage: "images/tree-optimized.gif",
+  flockBird: "images/birdan-optimized.gif",
+  flockBirdFallback: "images/birdan-optimized.gif",
   blueSquareImages: [
     "images/birdan-optimized.gif",
     "images/birdan-optimized.gif",
@@ -28,6 +30,12 @@ const soundConfig = {
   letter: "sounds/letter.mp3",
 };
 
+const yuvaTvVideos = [
+  { type: "youtube", id: "V0Oolnx5mv4", title: "YUVA TV" },
+  // Example fallback:
+  // { type: "file", src: "/videos/video1.webm", title: "YUVA TV" },
+];
+
 const envelopeFilters = {
   cream: "sepia(0.18) saturate(1.12) hue-rotate(236deg) brightness(0.92) contrast(0.88)",
   rose: "sepia(0.18) saturate(0.92) hue-rotate(312deg) brightness(0.98) contrast(0.88)",
@@ -51,12 +59,18 @@ const STORAGE_RESET_KEY = "yuvaLettersResetVersion";
 const STORAGE_RESET_VERSION = "2026-05-17-start-from-zero";
 const MAX_STORED_LETTERS = 160;
 const MAX_VISIBLE_ENVELOPES = 140;
+const TREE_ALPHA_THRESHOLD = 20;
+const BIRD_ALPHA_THRESHOLD = 20;
+const DEBUG_TREE_HIT_TEST = false;
 
 const mainImage = document.querySelector("#mainAnimatedImage");
 const mainTopImage = document.querySelector("#mainAnimatedTopImage");
-const mainImageArea = document.querySelector(".main-image-area");
+const mainImageArea = document.querySelector("#treeHitArea") || document.querySelector(".main-image-area");
 const atmosphereCanvas = document.querySelector("#atmosphereCanvas");
 const shootingStarLayer = document.querySelector("#shootingStarLayer");
+const slidingWorld = document.querySelector("#slidingWorld");
+const sceneArrowRight = document.querySelector("#sceneArrowRight");
+const sceneArrowLeft = document.querySelector("#sceneArrowLeft");
 const welcomeScreen = document.querySelector("#welcomeScreen");
 const welcomeEnter = document.querySelector("#welcomeEnter");
 const refreshHome = document.querySelector("#refreshHome");
@@ -116,18 +130,83 @@ const previewSticker = document.querySelector("#previewSticker");
 const resetLetter = document.querySelector("#resetLetter");
 const toast = document.querySelector("#toast");
 const sendButton = letterForm?.querySelector(".send-button");
+const chatWidget = document.querySelector("#chatWidget");
+const chatToggle = document.querySelector("#chatToggle");
+const chatUnread = document.querySelector("#chatUnread");
+const chatPanel = document.querySelector("#chatPanel");
+const chatClose = document.querySelector("#chatClose");
+const chatJoinForm = document.querySelector("#chatJoinForm");
+const chatNickname = document.querySelector("#chatNickname");
+const chatRoom = document.querySelector("#chatRoom");
+const chatMessages = document.querySelector("#chatMessages");
+const chatEmpty = document.querySelector("#chatEmpty");
+const chatLoadOlder = document.querySelector("#chatLoadOlder");
+const chatComposeForm = document.querySelector("#chatComposeForm");
+const chatMessageInput = document.querySelector("#chatMessageInput");
+const chatWarning = document.querySelector("#chatWarning");
+const chatOnlineCount = document.querySelector("#chatOnlineCount");
+const chatTyping = document.querySelector("#chatTyping");
+const chatAdminDialog = document.querySelector("#chatAdminDialog");
+const chatAdminForm = document.querySelector("#chatAdminForm");
+const chatAdminEmail = document.querySelector("#chatAdminEmail");
+const chatAdminPassword = document.querySelector("#chatAdminPassword");
+const chatAdminMessage = document.querySelector("#chatAdminMessage");
+const closeChatAdminDialog = document.querySelector("#closeChatAdminDialog");
+const dismissChatAdminDialog = document.querySelector("#dismissChatAdminDialog");
+const yuvaTvPlayerHost = document.querySelector("#yuvaTvPlayer");
+const yuvaTvStart = document.querySelector("#yuvaTvStart");
+const yuvaTvStatus = document.querySelector("#yuvaTvStatus");
+const yuvaTvMessage = document.querySelector("#yuvaTvMessage");
+const yuvaTvPlayPause = document.querySelector("#yuvaTvPlayPause");
+const yuvaTvMute = document.querySelector("#yuvaTvMute");
+const yuvaTvNext = document.querySelector("#yuvaTvNext");
 
 let toastTimer;
 let atmosphereParticles = [];
 let atmosphereFrame;
 let shootingStarTimer;
 let activeShootingStar = null;
+let birdFlockTimer;
+let activeBirdFlock = null;
+let currentScene = "main";
+let sceneHoverTimer;
+let treeHitCanvas;
+let treeHitContext;
+let treeHitSourceImage;
+let treeHitReady = false;
+let treeHitHasUsableAlpha = false;
+let treeHitUsesMask = false;
+let treePointerIsOpaque = false;
+let treePointerFrame = 0;
+let birdHitCanvas;
+let birdHitContext;
+let birdHitSourceImage;
+let birdHitReady = false;
 let catFrame;
 let catState;
 let letterFormStartedAt = 0;
 let sounds;
 let musicEnabled = true;
 let effectsEnabled = true;
+let chatSocket;
+let chatSessionId = "";
+let chatJoined = false;
+let chatJoinPending = false;
+let chatSocketInitTimer;
+let chatIsOpen = false;
+let chatIsAdmin = false;
+let chatUnreadCount = 0;
+let chatTypingTimer;
+let chatTypingClearTimer;
+let chatPendingMessageId = 0;
+let yuvaTvPlayer;
+let yuvaTvReady = false;
+let yuvaTvStarted = false;
+let yuvaTvIndex = 0;
+let yuvaTvMuted = true;
+let yuvaTvErrorTimer;
+let yuvaTvYouTubeApiPromise;
+let yuvaTvBrokenIndexes = new Set();
 
 function init() {
   resetSavedLettersOnce();
@@ -135,6 +214,9 @@ function init() {
   hydrateImages();
   initAtmosphere();
   initShootingStars();
+  initBirdFlocks();
+  initTreeHitTesting();
+  initSceneTransition();
   updateDateTime();
   setInterval(updateDateTime, 1000);
   updatePreview();
@@ -142,6 +224,8 @@ function init() {
   renderEnvelopeStack();
   loadPublicLetters();
   decorateBlueSquares();
+  initChat();
+  initYuvaTv();
   initDraggableBirds();
   bindEvents();
   dismissWelcomeScreen();
@@ -220,6 +304,243 @@ function stopTreeSound() {
   sounds.tree.currentTime = 0;
 }
 
+function initTreeHitTesting() {
+  if (!mainImageArea || !mainImage) return;
+
+  treeHitCanvas = document.createElement("canvas");
+  treeHitContext = treeHitCanvas.getContext("2d", { willReadFrequently: true });
+  if (!treeHitContext) return;
+
+  logTreeHitDebug("init", { listenerTarget: mainImageArea.id || mainImageArea.className });
+
+  const mask = new Image();
+  mask.decoding = "async";
+  mask.onload = () => prepareTreeHitCanvas(mask, { isMask: true });
+  mask.onerror = () => {
+    logTreeHitDebug("mask missing, using gif/approx fallback");
+    prepareTreeHitCanvas(mainImage, { isMask: false });
+  };
+  mask.src = "images/tree-hit-mask.png";
+
+  if (mainImage.complete && mainImage.naturalWidth) {
+    prepareTreeHitCanvas(mainImage, { isMask: false });
+  } else {
+    mainImage.addEventListener("load", () => {
+      if (!treeHitReady) prepareTreeHitCanvas(mainImage, { isMask: false });
+    }, { once: true });
+  }
+
+  mainImageArea.addEventListener("pointermove", handleTreePointerMove);
+  mainImageArea.addEventListener("pointerdown", handleTreePointerDown);
+  mainImageArea.addEventListener("pointerleave", resetTreeActiveState);
+  mainImageArea.addEventListener("pointercancel", resetTreeActiveState);
+}
+
+function prepareTreeHitCanvas(sourceImage, options = {}) {
+  if (!treeHitContext || !sourceImage?.naturalWidth || !sourceImage?.naturalHeight) return;
+
+  if (treeHitUsesMask && !options.isMask) return;
+
+  treeHitSourceImage = sourceImage;
+  treeHitUsesMask = Boolean(options.isMask);
+  treeHitCanvas.width = sourceImage.naturalWidth;
+  treeHitCanvas.height = sourceImage.naturalHeight;
+  treeHitContext.clearRect(0, 0, treeHitCanvas.width, treeHitCanvas.height);
+
+  try {
+    treeHitContext.drawImage(sourceImage, 0, 0, treeHitCanvas.width, treeHitCanvas.height);
+    treeHitContext.getImageData(0, 0, 1, 1);
+    treeHitReady = true;
+    treeHitHasUsableAlpha = hasUsableTreeAlpha();
+    logTreeHitDebug("canvas ready", {
+      isMask: treeHitUsesMask,
+      width: treeHitCanvas.width,
+      height: treeHitCanvas.height,
+      hasUsableAlpha: treeHitHasUsableAlpha,
+    });
+  } catch (error) {
+    treeHitReady = false;
+    treeHitHasUsableAlpha = false;
+    console.warn("Tree alpha hit-test canvas could not be read.", error);
+  }
+}
+
+function hasUsableTreeAlpha() {
+  if (!treeHitContext || !treeHitCanvas?.width || !treeHitCanvas?.height) return false;
+
+  const sampleSize = 9;
+  let opaqueCount = 0;
+  let transparentCount = 0;
+
+  try {
+    for (let yIndex = 0; yIndex < sampleSize; yIndex += 1) {
+      for (let xIndex = 0; xIndex < sampleSize; xIndex += 1) {
+        const x = Math.round((treeHitCanvas.width * (xIndex + 0.5)) / sampleSize);
+        const y = Math.round((treeHitCanvas.height * (yIndex + 0.5)) / sampleSize);
+        const alpha = treeHitContext.getImageData(Math.min(x, treeHitCanvas.width - 1), Math.min(y, treeHitCanvas.height - 1), 1, 1).data[3];
+        if (alpha > TREE_ALPHA_THRESHOLD) opaqueCount += 1;
+        else transparentCount += 1;
+      }
+    }
+  } catch (error) {
+    console.warn("Tree alpha hit-test sample failed.", error);
+    return false;
+  }
+
+  return opaqueCount > 0 && transparentCount > 0;
+}
+
+function getImagePixelCoordinates(event) {
+  if (!mainImage || !treeHitSourceImage?.naturalWidth || !treeHitSourceImage?.naturalHeight) {
+    logTreeHitDebug("coords unavailable", {
+      hasMainImage: Boolean(mainImage),
+      naturalWidth: treeHitSourceImage?.naturalWidth || 0,
+      naturalHeight: treeHitSourceImage?.naturalHeight || 0,
+    });
+    return null;
+  }
+
+  const rect = mainImage.getBoundingClientRect();
+  if (!rect.width || !rect.height) return null;
+
+  const imageRatio = treeHitSourceImage.naturalWidth / treeHitSourceImage.naturalHeight;
+  const rectRatio = rect.width / rect.height;
+  let renderedWidth = rect.width;
+  let renderedHeight = rect.height;
+  let renderedLeft = rect.left;
+  let renderedTop = rect.top;
+
+  if (rectRatio > imageRatio) {
+    renderedWidth = rect.height * imageRatio;
+    renderedLeft = rect.left + (rect.width - renderedWidth) / 2;
+  } else {
+    renderedHeight = rect.width / imageRatio;
+    renderedTop = rect.top + (rect.height - renderedHeight) / 2;
+  }
+
+  const relativeX = event.clientX - renderedLeft;
+  const relativeY = event.clientY - renderedTop;
+  if (relativeX < 0 || relativeY < 0 || relativeX > renderedWidth || relativeY > renderedHeight) return null;
+
+  return {
+    x: Math.floor((relativeX / renderedWidth) * treeHitSourceImage.naturalWidth),
+    y: Math.floor((relativeY / renderedHeight) * treeHitSourceImage.naturalHeight),
+    normalizedX: relativeX / renderedWidth,
+    normalizedY: relativeY / renderedHeight,
+  };
+}
+
+function isPointerOnOpaquePixel(event) {
+  const point = getImagePixelCoordinates(event);
+  if (!point) {
+    logTreeHitDebug("hit-test", { hasEvent: Boolean(event), isOpaque: false, reason: "outside-rendered-image" });
+    return false;
+  }
+
+  if (!treeHitReady || !treeHitContext || !treeHitCanvas || !treeHitHasUsableAlpha) {
+    const approximateOpaque = isPointerInApproximateTreeShape(point);
+    logTreeHitDebug("hit-test approximate", {
+      x: point.x,
+      y: point.y,
+      normalizedX: point.normalizedX.toFixed(3),
+      normalizedY: point.normalizedY.toFixed(3),
+      ready: treeHitReady,
+      hasUsableAlpha: treeHitHasUsableAlpha,
+      isOpaque: approximateOpaque,
+    });
+    return approximateOpaque;
+  }
+
+  try {
+    const safeX = Math.max(0, Math.min(treeHitCanvas.width - 1, point.x));
+    const safeY = Math.max(0, Math.min(treeHitCanvas.height - 1, point.y));
+    const alpha = treeHitContext.getImageData(safeX, safeY, 1, 1).data[3];
+    const isOpaque = alpha > TREE_ALPHA_THRESHOLD;
+    const approximateOpaque = isPointerInApproximateTreeShape(point);
+    const finalOpaque = isOpaque || (!treeHitUsesMask && approximateOpaque && alpha <= TREE_ALPHA_THRESHOLD);
+    logTreeHitDebug("hit-test alpha", {
+      x: safeX,
+      y: safeY,
+      alpha,
+      isOpaque: finalOpaque,
+      alphaOpaque: isOpaque,
+      approximateOpaque,
+      source: treeHitUsesMask ? "mask" : "gif",
+    });
+    return finalOpaque;
+  } catch (error) {
+    console.warn("Tree alpha hit-test failed.", error);
+    const approximateOpaque = isPointerInApproximateTreeShape(point);
+    logTreeHitDebug("hit-test fallback after error", { isOpaque: approximateOpaque });
+    return approximateOpaque;
+  }
+}
+
+function isPointerInApproximateTreeShape(point) {
+  const x = point.normalizedX;
+  const y = point.normalizedY;
+  const inCanopy = isPointInEllipse(x, y, 0.5, 0.42, 0.34, 0.32);
+  const inLeftCanopy = isPointInEllipse(x, y, 0.37, 0.48, 0.2, 0.24);
+  const inRightCanopy = isPointInEllipse(x, y, 0.63, 0.5, 0.2, 0.24);
+  const inLowerBranches = isPointInEllipse(x, y, 0.5, 0.64, 0.25, 0.18);
+  const inTrunk = x > 0.43 && x < 0.57 && y > 0.56 && y < 0.95;
+  const inBase = isPointInEllipse(x, y, 0.5, 0.86, 0.18, 0.1);
+
+  return inCanopy || inLeftCanopy || inRightCanopy || inLowerBranches || inTrunk || inBase;
+}
+
+function isPointInEllipse(x, y, centerX, centerY, radiusX, radiusY) {
+  return ((x - centerX) ** 2) / (radiusX ** 2) + ((y - centerY) ** 2) / (radiusY ** 2) <= 1;
+}
+
+function logTreeHitDebug(message, details) {
+  if (!DEBUG_TREE_HIT_TEST) return;
+  console.log("[tree-hit-test]", message, details || "");
+}
+
+function setTreeActiveState(active) {
+  treePointerIsOpaque = active;
+  mainImageArea?.classList.toggle("is-tree-hovered", active);
+  if (!active) stopTreeSound();
+}
+
+function triggerTreeInteraction() {
+  setTreeActiveState(true);
+  logTreeHitDebug("trigger");
+  playTreeSound();
+}
+
+function updateTreePointerState(event) {
+  const isOpaque = isPointerOnOpaquePixel(event);
+  if (isOpaque && !treePointerIsOpaque) {
+    triggerTreeInteraction();
+    return;
+  }
+
+  if (!isOpaque && treePointerIsOpaque) {
+    setTreeActiveState(false);
+  }
+}
+
+function handleTreePointerMove(event) {
+  window.cancelAnimationFrame(treePointerFrame);
+  treePointerFrame = window.requestAnimationFrame(() => updateTreePointerState(event));
+}
+
+function handleTreePointerDown(event) {
+  if (!isPointerOnOpaquePixel(event)) {
+    setTreeActiveState(false);
+    return;
+  }
+
+  if (!treePointerIsOpaque) triggerTreeInteraction();
+}
+
+function resetTreeActiveState() {
+  window.cancelAnimationFrame(treePointerFrame);
+  setTreeActiveState(false);
+}
+
 function playCatSound() {
   if (!sounds?.cat || !effectsEnabled) return;
   sounds.cat.currentTime = 0;
@@ -286,21 +607,28 @@ function initAtmosphere() {
 
   const context = atmosphereCanvas.getContext("2d");
   const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const atmosphereWidth = () => window.innerWidth * 2;
+  const isMobileAtmosphere = () => window.matchMedia("(max-width: 768px)").matches;
 
   function resize() {
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    atmosphereCanvas.width = Math.floor(window.innerWidth * dpr);
+    const worldWidth = atmosphereWidth();
+    atmosphereCanvas.width = Math.floor(worldWidth * dpr);
     atmosphereCanvas.height = Math.floor(window.innerHeight * dpr);
-    atmosphereCanvas.style.width = `${window.innerWidth}px`;
+    atmosphereCanvas.style.width = `${worldWidth}px`;
     atmosphereCanvas.style.height = `${window.innerHeight}px`;
     context.setTransform(dpr, 0, 0, dpr, 0, 0);
     createAtmosphereParticles();
   }
 
   function createAtmosphereParticles() {
-    const count = Math.min(42, Math.max(16, Math.floor((window.innerWidth * window.innerHeight) / 52000)));
+    const worldWidth = atmosphereWidth();
+    const density = isMobileAtmosphere() ? 155000 : 52000;
+    const maxParticles = isMobileAtmosphere() ? 24 : 84;
+    const minParticles = isMobileAtmosphere() ? 10 : 32;
+    const count = Math.min(maxParticles, Math.max(minParticles, Math.floor((worldWidth * window.innerHeight) / density)));
     atmosphereParticles = Array.from({ length: count }, () => ({
-      x: Math.random() * window.innerWidth,
+      x: Math.random() * worldWidth,
       y: Math.random() * window.innerHeight,
       radius: Math.random() * 1.35 + 0.45,
       alpha: 1,
@@ -311,16 +639,19 @@ function initAtmosphere() {
   }
 
   function drawGrain() {
-    context.globalAlpha = 0.065;
+    const worldWidth = atmosphereWidth();
+    const grainCount = isMobileAtmosphere() ? 320 : 1700;
+    context.globalAlpha = isMobileAtmosphere() ? 0.034 : 0.065;
     context.fillStyle = "#fff8d8";
-    for (let i = 0; i < 850; i += 1) {
-      context.fillRect(Math.random() * window.innerWidth, Math.random() * window.innerHeight, 0.8, 0.8);
+    for (let i = 0; i < grainCount; i += 1) {
+      context.fillRect(Math.random() * worldWidth, Math.random() * window.innerHeight, 0.8, 0.8);
     }
     context.globalAlpha = 1;
   }
 
   function draw() {
-    context.clearRect(0, 0, window.innerWidth, window.innerHeight);
+    const worldWidth = atmosphereWidth();
+    context.clearRect(0, 0, worldWidth, window.innerHeight);
     drawGrain();
 
     atmosphereParticles.forEach((particle) => {
@@ -329,8 +660,8 @@ function initAtmosphere() {
       particle.y += particle.driftY;
 
       if (particle.y < -8) particle.y = window.innerHeight + 8;
-      if (particle.x < -8) particle.x = window.innerWidth + 8;
-      if (particle.x > window.innerWidth + 8) particle.x = -8;
+      if (particle.x < -8) particle.x = worldWidth + 8;
+      if (particle.x > worldWidth + 8) particle.x = -8;
 
       const glow = 0.82 + Math.sin(particle.pulse) * 0.18;
       const gradient = context.createRadialGradient(particle.x, particle.y, 0, particle.x, particle.y, particle.radius * 7);
@@ -366,11 +697,137 @@ function initShootingStars() {
   scheduleNextShootingStar(6000, 12000);
 }
 
+function initBirdFlocks() {
+  if (!slidingWorld) return;
+
+  const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  if (reducedMotion) return;
+
+  window.spawnYuvaBirdFlock = spawnBirdFlock;
+  scheduleNextBirdFlock();
+}
+
+function scheduleNextBirdFlock(minDelay = 18000, maxDelay = 42000) {
+  window.clearTimeout(birdFlockTimer);
+  birdFlockTimer = window.setTimeout(() => {
+    if (welcomeScreen && !welcomeScreen.classList.contains("is-hidden")) {
+      scheduleNextBirdFlock(6000, 12000);
+      return;
+    }
+
+    spawnBirdFlock();
+    scheduleNextBirdFlock();
+  }, randomBetween(minDelay, maxDelay));
+}
+
+function spawnBirdFlock() {
+  if (!slidingWorld || activeBirdFlock) return;
+
+  const flock = document.createElement("div");
+  flock.className = "bird-flock";
+  flock.setAttribute("aria-hidden", "true");
+
+  const viewportWidth = window.innerWidth;
+  const viewportHeight = window.innerHeight;
+  const birdCount = Math.floor(randomBetween(3, 5));
+  const startX = viewportWidth * randomBetween(1.28, 1.72);
+  const startY = viewportHeight * randomBetween(0.14, 0.3);
+  const treeX = viewportWidth * randomBetween(0.38, 0.48);
+  const treeY = viewportHeight * randomBetween(0.34, 0.48);
+  const duration = randomBetween(9000, 13500);
+  const finished = [];
+
+  for (let index = 0; index < birdCount; index += 1) {
+    const track = document.createElement("span");
+    const bird = document.createElement("img");
+    const delay = index * randomBetween(120, 380);
+    const scale = randomBetween(0.76, 1.08);
+    const yOffset = randomBetween(-24, 28);
+    const xOffset = randomBetween(-42, 34);
+
+    track.className = "flock-bird-track";
+    track.style.setProperty("--bird-start-x", `${startX + xOffset}px`);
+    track.style.setProperty("--bird-start-y", `${startY + yOffset}px`);
+    track.style.setProperty("--bird-end-x", `${treeX + randomBetween(-18, 26)}px`);
+    track.style.setProperty("--bird-end-y", `${treeY + randomBetween(-18, 24)}px`);
+    track.style.setProperty("--bird-duration", `${duration + randomBetween(-1200, 1200)}ms`);
+    track.style.setProperty("--bird-delay", `${delay}ms`);
+
+    bird.className = "flock-bird";
+    bird.classList.add("is-flying-left");
+    bird.src = imageConfig.flockBird;
+    bird.alt = "";
+    bird.draggable = false;
+    bird.style.setProperty("--bird-scale", scale.toFixed(2));
+    bird.style.setProperty("--bird-bob-duration", `${randomBetween(1800, 2600)}ms`);
+    bird.addEventListener("error", () => {
+      if (!bird.src.endsWith("birdan-optimized.gif")) bird.src = imageConfig.flockBirdFallback;
+    }, { once: true });
+
+    track.appendChild(bird);
+    flock.appendChild(track);
+
+    track.addEventListener("animationend", () => {
+      finished.push(track);
+      if (finished.length >= birdCount) clearBirdFlock();
+    });
+  }
+
+  function clearBirdFlock() {
+    flock.remove();
+    activeBirdFlock = null;
+  }
+
+  activeBirdFlock = { clear: clearBirdFlock };
+  slidingWorld.appendChild(flock);
+  window.setTimeout(clearBirdFlock, duration + 2600);
+}
+
+function initSceneTransition() {
+  if (!slidingWorld || !sceneArrowRight || !sceneArrowLeft) return;
+
+  [sceneArrowRight, sceneArrowLeft].forEach((button) => {
+    const image = button.querySelector("img");
+    image?.addEventListener("error", () => button.classList.add("has-fallback"), { once: true });
+    if (image?.complete && image.naturalWidth === 0) button.classList.add("has-fallback");
+  });
+
+  const supportsHover = window.matchMedia("(hover: hover) and (pointer: fine)").matches;
+  const queueScene = (scene) => {
+    window.clearTimeout(sceneHoverTimer);
+    sceneHoverTimer = window.setTimeout(() => setScene(scene), supportsHover ? 420 : 0);
+  };
+  const cancelQueuedScene = () => window.clearTimeout(sceneHoverTimer);
+
+  sceneArrowRight.addEventListener("click", () => setScene("right"));
+  sceneArrowLeft.addEventListener("click", () => setScene("main"));
+
+  if (supportsHover) {
+    sceneArrowRight.addEventListener("pointerenter", () => queueScene("right"));
+    sceneArrowLeft.addEventListener("pointerenter", () => queueScene("main"));
+    sceneArrowRight.addEventListener("pointerleave", cancelQueuedScene);
+    sceneArrowLeft.addEventListener("pointerleave", cancelQueuedScene);
+  }
+
+  setScene("main");
+}
+
+function setScene(scene) {
+  currentScene = scene === "right" ? "right" : "main";
+  slidingWorld?.classList.toggle("is-right", currentScene === "right");
+  if (sceneArrowRight) sceneArrowRight.hidden = currentScene !== "main";
+  if (sceneArrowLeft) sceneArrowLeft.hidden = currentScene !== "right";
+}
+
+function getSceneViewportOffset() {
+  return currentScene === "right" ? window.innerWidth : 0;
+}
+
 function handleShootingStarPointerDown(event) {
   if (!activeShootingStar?.point) return;
   if (event.target?.closest?.("dialog")) return;
 
-  const dx = event.clientX - activeShootingStar.point.x;
+  const dx = event.clientX + getSceneViewportOffset() - activeShootingStar.point.x;
   const dy = event.clientY - activeShootingStar.point.y;
   const hitRadius = activeShootingStar.hitRadius || 34;
 
@@ -399,23 +856,25 @@ function spawnShootingStar() {
 
   shootingStarLayer.setAttribute("aria-hidden", "false");
 
-  const width = window.innerWidth;
+  const viewportWidth = window.innerWidth;
+  const worldWidth = viewportWidth * 2;
   const height = window.innerHeight;
+  const viewportOffset = getSceneViewportOffset();
   const fromLeft = Math.random() > 0.5;
-  const startX = fromLeft ? -48 : width + 48;
-  const endX = fromLeft ? width * randomBetween(0.66, 0.92) : width * randomBetween(0.08, 0.34);
+  const startX = viewportOffset + (fromLeft ? -48 : viewportWidth + 48);
+  const endX = viewportOffset + (fromLeft ? viewportWidth * randomBetween(0.66, 0.92) : viewportWidth * randomBetween(0.08, 0.34));
   const startY = height * randomBetween(0.1, 0.2);
   const endY = height * randomBetween(0.24, 0.35);
-  const controlX = fromLeft ? width * randomBetween(0.22, 0.45) : width * randomBetween(0.55, 0.78);
+  const controlX = viewportOffset + (fromLeft ? viewportWidth * randomBetween(0.22, 0.45) : viewportWidth * randomBetween(0.55, 0.78));
   const controlY = height * randomBetween(0.1, 0.16);
   const pathData = `M ${startX} ${startY} Q ${controlX} ${controlY} ${endX} ${endY}`;
   const duration = randomBetween(7000, 10000);
-  const trailLength = Math.min(width * 0.22, 300);
+  const trailLength = Math.min(viewportWidth * 0.22, 300);
 
   const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
   svg.classList.add("shooting-star-svg");
   svg.setAttribute("aria-hidden", "true");
-  svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
+  svg.setAttribute("viewBox", `0 0 ${worldWidth} ${height}`);
   svg.setAttribute("preserveAspectRatio", "none");
 
   const defs = document.createElementNS("http://www.w3.org/2000/svg", "defs");
@@ -477,7 +936,7 @@ function spawnShootingStar() {
 
     if (activeShootingStar) {
       activeShootingStar.point = { x: point.x, y: point.y };
-      activeShootingStar.hitRadius = Math.max(34, Math.min(48, width * 0.035));
+      activeShootingStar.hitRadius = Math.max(34, Math.min(48, viewportWidth * 0.035));
     }
 
     star.style.transform = `translate3d(${point.x}px, ${point.y}px, 0) translate(-50%, -50%) rotate(${angle}deg)`;
@@ -558,6 +1017,633 @@ function hydrateImages() {
   });
 }
 
+function initChat() {
+  if (!chatWidget) return;
+
+  chatSessionId = getOrCreateChatSessionId();
+  setChatOpen(false);
+
+  chatToggle?.addEventListener("click", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setChatOpen(!chatIsOpen);
+  });
+  chatClose?.addEventListener("click", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setChatOpen(false);
+  });
+  chatLoadOlder?.addEventListener("click", loadOlderChatMessages);
+  chatJoinForm?.addEventListener("submit", joinChat);
+  chatComposeForm?.addEventListener("submit", sendChatMessage);
+  chatMessageInput?.addEventListener("keydown", (event) => {
+    if (event.key === "Enter" && !event.shiftKey) {
+      event.preventDefault();
+      chatComposeForm?.requestSubmit();
+    }
+  });
+  chatMessageInput?.addEventListener("input", sendChatTyping);
+  chatMessages?.addEventListener("click", reportChatMessage);
+
+  document.addEventListener("keydown", (event) => {
+    const isYShortcut = event.key?.toLocaleLowerCase("tr-TR") === "y" || event.code === "KeyY";
+    if (event.ctrlKey && event.shiftKey && isYShortcut) {
+      event.preventDefault();
+      openChatAdminLogin();
+    }
+  });
+
+  let logoClicks = [];
+  refreshHome?.addEventListener("click", () => {
+    const now = Date.now();
+    logoClicks = [...logoClicks.filter((time) => now - time < 1800), now];
+    if (logoClicks.length >= 5) {
+      logoClicks = [];
+      openChatAdminLogin();
+    }
+  });
+
+  closeChatAdminDialog?.addEventListener("click", () => chatAdminDialog.close());
+  dismissChatAdminDialog?.addEventListener("click", () => chatAdminDialog.close());
+  chatAdminForm?.addEventListener("submit", loginChatAdmin);
+
+  connectChatSocket();
+
+  window.setInterval(() => {
+    if (chatJoined) chatSocket?.emit("chat:heartbeat");
+  }, 25000);
+}
+
+function connectChatSocket() {
+  if (chatSocket || typeof io !== "function") {
+    if (!chatSocket && !chatSocketInitTimer) {
+      chatSocketInitTimer = window.setTimeout(() => {
+        chatSocketInitTimer = undefined;
+        connectChatSocket();
+      }, 800);
+    }
+    return;
+  }
+
+  checkChatAdminState();
+  loadChatMessages();
+  chatSocket = io({ transports: ["websocket", "polling"], reconnection: true });
+  chatSocket.on("connect", () => {
+    if (!chatJoined || !chatJoinPending) return;
+    emitChatJoin();
+  });
+  chatSocket.on("chat:message", (message) => appendChatMessage(message));
+  chatSocket.on("chat:presence", (presence) => {
+    if (chatOnlineCount) chatOnlineCount.textContent = String(presence.onlineCount || 0);
+  });
+  chatSocket.on("chat:typing", (payload) => {
+    if (!payload?.typing || payload.userSessionId === chatSessionId) return;
+    if (chatTyping) chatTyping.textContent = "birisi yaz?yor...";
+    window.clearTimeout(chatTypingClearTimer);
+    chatTypingClearTimer = window.setTimeout(() => {
+      if (chatTyping) chatTyping.textContent = "birisi yaz?yor...";
+    }, 1800);
+  });
+  chatSocket.on("chat:moderated", (message) => {
+    if (!message?.id) return;
+    if (message.userSessionId) {
+      chatMessages?.querySelectorAll(`[data-session-id="${message.userSessionId}"]`).forEach((element) => element.remove());
+      updateChatEmptyState();
+      return;
+    }
+    const element = chatMessages?.querySelector(`[data-message-id="${message.id}"]`);
+    if (element) element.remove();
+    updateChatEmptyState();
+  });
+  chatSocket.on("chat:banned", (payload) => {
+    if (payload?.userSessionId !== chatSessionId) return;
+    chatJoined = false;
+    chatJoinPending = false;
+    chatRoom.hidden = true;
+    chatJoinForm.hidden = false;
+    chatWidget?.classList.remove("is-joined");
+    setChatWarning("Bu sohbet alan?na eri?imin kapal?.");
+  });
+}
+
+function getOrCreateChatSessionId() {
+  const key = "yuvaChatSessionId";
+  const existing = localStorage.getItem(key);
+  if (existing) return existing;
+
+  const created = window.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  localStorage.setItem(key, created);
+  return created;
+}
+
+function setChatOpen(open) {
+  chatIsOpen = open;
+  chatWidget?.classList.toggle("is-open", open);
+  chatPanel.hidden = !open;
+  chatToggle?.setAttribute("aria-expanded", String(open));
+  if (open) {
+    chatUnreadCount = 0;
+    updateChatUnread();
+  }
+}
+
+async function loadChatMessages(beforeId = "") {
+  try {
+    const params = new URLSearchParams({ limit: "50" });
+    if (beforeId) params.set("before", beforeId);
+    const response = await fetch(`/api/chat/messages?${params.toString()}`);
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || "Chat messages failed");
+
+    if (chatOnlineCount) chatOnlineCount.textContent = String(data.onlineCount || 0);
+    const messages = Array.isArray(data.messages) ? data.messages : [];
+    if (!beforeId) chatMessages.innerHTML = "";
+    messages.forEach((message) => appendChatMessage(message, { prepend: Boolean(beforeId), quiet: true }));
+    updateChatEmptyState();
+  } catch (error) {
+    setChatWarning("Sohbet ?u an y?klenemedi.");
+  }
+}
+
+function loadOlderChatMessages() {
+  const first = chatMessages?.querySelector("[data-message-id]");
+  if (first?.dataset.messageId) {
+    loadChatMessages(first.dataset.messageId);
+  }
+}
+
+function joinChat(event) {
+  event.preventDefault();
+  const nickname = chatNickname.value.trim();
+  if (!nickname) return;
+
+  chatJoined = true;
+  chatJoinPending = false;
+  chatJoinForm.hidden = true;
+  chatRoom.hidden = false;
+  chatWidget?.classList.add("is-joined");
+  setChatOpen(true);
+  setChatWarning("");
+  updateChatComposeState();
+  chatMessageInput?.focus();
+
+  if (!chatSocket) {
+    connectChatSocket();
+    updateChatComposeState();
+    return;
+  }
+
+  emitChatJoin();
+}
+
+function emitChatJoin() {
+  if (!chatSocket || !chatJoined) return;
+
+  chatSocket.emit("chat:join", { nickname: chatNickname.value.trim(), userSessionId: chatSessionId }, (response) => {
+    if (!response?.ok) {
+      chatJoined = false;
+      chatJoinPending = false;
+      chatRoom.hidden = true;
+      chatJoinForm.hidden = false;
+      chatWidget?.classList.remove("is-joined");
+      setChatOpen(true);
+      setChatWarning(response?.error || "Sohbete kat?lamad?n.");
+      updateChatComposeState();
+      chatNickname?.focus();
+      return;
+    }
+
+    chatJoined = true;
+    chatJoinPending = false;
+    chatIsAdmin = Boolean(response.isAdmin);
+    chatJoinForm.hidden = true;
+    chatRoom.hidden = false;
+    chatWidget?.classList.add("is-joined");
+    setChatOpen(true);
+    setChatWarning("");
+    updateChatComposeState();
+    chatMessageInput?.focus();
+  });
+}
+
+function sendChatMessage(event) {
+  event.preventDefault();
+  setChatOpen(true);
+  const text = chatMessageInput.value.trim();
+  if (!text) return;
+
+  if (chatJoinPending || !chatJoined) {
+    setChatWarning("Sohbete baglaninca gonderebilirsin.");
+    return;
+  }
+
+  const pendingId = `pending-${Date.now()}-${chatPendingMessageId++}`;
+  const pendingMessage = {
+    id: pendingId,
+    nickname: chatNickname?.value?.trim() || "cicikus",
+    text,
+    createdAt: new Date().toISOString(),
+    isAdmin: chatIsAdmin,
+    type: "user",
+    pending: true,
+  };
+
+  appendChatMessage(pendingMessage, { quiet: true });
+  chatMessageInput.value = "";
+  setChatWarning("");
+  chatMessageInput?.focus();
+
+  sendChatMessageToServer({ text, pendingId }).catch((error) => {
+    markChatMessageFailed(pendingId);
+    setChatWarning(error.message || "Mesaj gonderilemedi.");
+  });
+}
+
+async function sendChatMessageToServer({ text, pendingId }) {
+  connectChatSocket();
+  const response = await fetch("/api/chat/messages", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      nickname: chatNickname?.value?.trim() || "cicikus",
+      text,
+      userSessionId: chatSessionId,
+    }),
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(data.error || "Mesaj gonderilemedi.");
+  }
+
+  settlePendingChatMessage(pendingId, data.message);
+  setChatWarning("");
+  setChatOpen(true);
+  chatMessageInput?.focus();
+}
+
+function updateChatComposeState() {
+  const disabled = chatJoinPending || !chatJoined;
+  if (chatMessageInput) chatMessageInput.disabled = disabled;
+  const send = chatComposeForm?.querySelector("button");
+  if (send) send.disabled = disabled;
+}
+
+function markChatMessageFailed(id) {
+  const element = chatMessages?.querySelector(`[data-message-id="${id}"]`);
+  if (!element) return;
+  element.classList.add("is-failed");
+  const pending = element.querySelector("[data-pending-label]");
+  if (pending) pending.textContent = "g?nderilemedi";
+}
+
+function settlePendingChatMessage(id, message) {
+  const element = chatMessages?.querySelector(`[data-message-id="${id}"]`);
+  if (!element || !message) return;
+  const existing = chatMessages?.querySelector(`[data-message-id="${message.id}"]`);
+  if (existing && existing !== element) {
+    element.remove();
+    updateChatEmptyState();
+    return;
+  }
+
+  element.dataset.messageId = message.id;
+  element.classList.remove("is-pending", "is-failed");
+  element.classList.toggle("is-admin", Boolean(message.isAdmin));
+  const name = element.querySelector(".chat-message-name");
+  const pending = element.querySelector("[data-pending-label]");
+  const report = element.querySelector(".chat-report");
+
+  if (name) name.textContent = message.nickname || "ciciku?";
+
+  pending?.remove();
+  if (report) report.dataset.reportId = message.id;
+}
+
+function sendChatTyping() {
+  if (!chatJoined) return;
+  chatSocket?.emit("chat:typing", { typing: true });
+  window.clearTimeout(chatTypingTimer);
+  chatTypingTimer = window.setTimeout(() => {
+    chatSocket?.emit("chat:typing", { typing: false });
+  }, 1000);
+}
+
+function appendChatMessage(message, options = {}) {
+  if (!chatMessages || !message?.id) return;
+  if (chatMessages.querySelector(`[data-message-id="${message.id}"]`)) return;
+
+  const item = document.createElement("article");
+  item.className = `chat-message${message.isAdmin ? " is-admin" : ""}${message.type === "system" ? " is-system" : ""}${message.pending ? " is-pending" : ""}`;
+  item.dataset.messageId = message.id;
+  if (message.userSessionId) item.dataset.sessionId = message.userSessionId;
+
+  if (message.type === "system") {
+    item.innerHTML = `<p>${escapeHtml(message.text || "")}</p>`;
+  } else {
+    item.innerHTML = `
+      <header>
+        <span class="chat-message-name">${escapeHtml(message.nickname || "ciciku?")}</span>
+        ${message.isAdmin ? '<span class="chat-admin-badge">admin</span>' : ""}
+        ${message.pending ? '<span class="chat-message-time" data-pending-label>g?nderiliyor</span>' : ""}
+        <button class="chat-report" type="button" data-report-id="${message.id}" aria-label="Mesaj? bildir">!</button>
+      </header>
+      <p>${escapeHtml(message.text || "")}</p>
+    `;
+  }
+
+  if (options.prepend) {
+    chatMessages.prepend(item);
+  } else {
+    chatMessages.append(item);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+  }
+
+  if (!options.quiet && !chatIsOpen) {
+    chatUnreadCount += 1;
+    updateChatUnread();
+  }
+
+  updateChatEmptyState();
+}
+
+async function reportChatMessage(event) {
+  const button = event.target.closest("[data-report-id]");
+  if (!button) return;
+
+  try {
+    const response = await fetch(`/api/chat/report/${button.dataset.reportId}`, { method: "POST" });
+    if (!response.ok) throw new Error("Report failed");
+    button.disabled = true;
+    button.textContent = "?";
+  } catch (error) {
+    setChatWarning("Bildirim g?nderilemedi.");
+  }
+}
+
+function updateChatEmptyState() {
+  if (!chatEmpty || !chatMessages) return;
+  chatEmpty.hidden = Boolean(chatMessages.querySelector("[data-message-id]"));
+}
+
+function updateChatUnread() {
+  if (!chatUnread) return;
+  chatUnread.hidden = chatUnreadCount <= 0;
+  chatUnread.textContent = String(Math.min(chatUnreadCount, 9));
+}
+
+function setChatWarning(message) {
+  if (chatWarning) chatWarning.textContent = message;
+}
+
+function initYuvaTv() {
+  if (!yuvaTvPlayerHost) return;
+
+  updateYuvaTvStatus(yuvaTvVideos.length ? `${yuvaTvVideos.length} video` : "video listesi bekliyor");
+  showYuvaTvMessage(yuvaTvVideos.length ? "Başlat" : "Video bekliyor");
+  setYuvaTvControlsDisabled(!yuvaTvVideos.length);
+
+  yuvaTvPlayerHost.addEventListener("click", startYuvaTv);
+  yuvaTvPlayPause?.addEventListener("click", stopYuvaTv);
+  yuvaTvMute?.addEventListener("click", toggleYuvaTvMute);
+  yuvaTvNext?.addEventListener("click", () => playNextYuvaTvVideo({ manual: true }));
+}
+
+async function startYuvaTv() {
+  if (!yuvaTvVideos.length) {
+    updateYuvaTvStatus("video listesi bekliyor");
+    showYuvaTvMessage("Video bekliyor");
+    return;
+  }
+
+  yuvaTvStarted = true;
+  yuvaTvBrokenIndexes.clear();
+  setYuvaTvControlsDisabled(false);
+  await loadYuvaTvVideo(yuvaTvIndex, { autoplay: true });
+}
+
+async function loadYuvaTvVideo(index, options = {}) {
+  clearTimeout(yuvaTvErrorTimer);
+  const video = yuvaTvVideos[index];
+  if (!video || !yuvaTvPlayerHost) return;
+
+  yuvaTvReady = false;
+  yuvaTvPlayerHost.replaceChildren();
+  updateYuvaTvStatus(video.title || "YUVA TV");
+  showYuvaTvMessage("Yükleniyor...");
+
+  if (video.type === "file") {
+    loadYuvaTvFile(video, options);
+    return;
+  }
+
+  await loadYuvaTvYoutube(video, options);
+}
+
+async function loadYuvaTvYoutube(video, options = {}) {
+  try {
+    await loadYouTubeIframeApi();
+    if (!window.YT?.Player || !yuvaTvPlayerHost) throw new Error("YouTube API yüklenemedi.");
+
+    const mount = document.createElement("div");
+    mount.id = "yuvaTvYoutubeMount";
+    yuvaTvPlayerHost.replaceChildren(mount);
+
+    yuvaTvPlayer = new YT.Player(mount, {
+      width: "100%",
+      height: "100%",
+      videoId: video.id,
+      playerVars: {
+        autoplay: options.autoplay ? 1 : 0,
+        controls: 0,
+        modestbranding: 1,
+        rel: 0,
+        playsinline: 1,
+        origin: window.location.origin,
+      },
+      events: {
+        onReady: () => {
+          yuvaTvReady = true;
+          yuvaTvBrokenIndexes.delete(yuvaTvIndex);
+          const iframe = yuvaTvPlayer.getIframe?.();
+          iframe?.setAttribute("referrerpolicy", "strict-origin-when-cross-origin");
+          iframe?.setAttribute("allow", "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share");
+          iframe?.setAttribute("allowfullscreen", "");
+          if (yuvaTvMuted) yuvaTvPlayer.mute();
+          else yuvaTvPlayer.unMute();
+          if (options.autoplay) yuvaTvPlayer.playVideo();
+          showYuvaTvMessage("");
+          updateYuvaTvButtons();
+          updateYuvaTvStatus("yayında");
+        },
+        onStateChange: handleYuvaTvStateChange,
+        onError: handleYuvaTvError,
+      },
+    });
+  } catch (error) {
+    handleYuvaTvError(error);
+  }
+}
+
+function loadYuvaTvFile(video, options = {}) {
+  const element = document.createElement("video");
+  element.src = video.src;
+  element.controls = true;
+  element.muted = yuvaTvMuted;
+  element.playsInline = true;
+  element.preload = "metadata";
+  element.addEventListener("ended", () => playNextYuvaTvVideo());
+  element.addEventListener("error", handleYuvaTvError);
+  yuvaTvPlayerHost.replaceChildren(element);
+  yuvaTvPlayer = element;
+  yuvaTvReady = true;
+  yuvaTvBrokenIndexes.delete(yuvaTvIndex);
+  showYuvaTvMessage("");
+  updateYuvaTvStatus("yayında");
+  updateYuvaTvButtons();
+  if (options.autoplay) element.play().catch(() => showYuvaTvMessage("Başlat"));
+}
+
+function loadYouTubeIframeApi() {
+  if (window.YT?.Player) return Promise.resolve();
+  if (yuvaTvYouTubeApiPromise) return yuvaTvYouTubeApiPromise;
+
+  yuvaTvYouTubeApiPromise = new Promise((resolve, reject) => {
+    const existing = document.querySelector('script[src="https://www.youtube.com/iframe_api"]');
+    const previousReady = window.onYouTubeIframeAPIReady;
+    const timeout = window.setTimeout(() => reject(new Error("YouTube API zaman aşımı.")), 8000);
+
+    window.onYouTubeIframeAPIReady = () => {
+      previousReady?.();
+      window.clearTimeout(timeout);
+      resolve();
+    };
+
+    if (!existing) {
+      const script = document.createElement("script");
+      script.src = "https://www.youtube.com/iframe_api";
+      script.async = true;
+      script.onerror = () => {
+        window.clearTimeout(timeout);
+        reject(new Error("YouTube API yüklenemedi."));
+      };
+      document.head.appendChild(script);
+    }
+  });
+
+  return yuvaTvYouTubeApiPromise;
+}
+
+function handleYuvaTvStateChange(event) {
+  if (!window.YT?.PlayerState) return;
+  if (event.data === YT.PlayerState.ENDED) {
+    playNextYuvaTvVideo();
+    return;
+  }
+
+  updateYuvaTvButtons();
+}
+
+function handleYuvaTvError() {
+  showYuvaTvMessage("Bu video şu an oynatılamıyor.");
+  updateYuvaTvStatus("oynatılamıyor");
+  yuvaTvBrokenIndexes.add(yuvaTvIndex);
+  clearTimeout(yuvaTvErrorTimer);
+  if (yuvaTvBrokenIndexes.size >= yuvaTvVideos.length) {
+    yuvaTvStarted = false;
+    return;
+  }
+  yuvaTvErrorTimer = window.setTimeout(() => playNextYuvaTvVideo(), 2000);
+}
+
+function playNextYuvaTvVideo() {
+  if (!yuvaTvVideos.length) return;
+  for (let step = 0; step < yuvaTvVideos.length; step += 1) {
+    yuvaTvIndex = (yuvaTvIndex + 1) % yuvaTvVideos.length;
+    if (!yuvaTvBrokenIndexes.has(yuvaTvIndex)) break;
+  }
+  loadYuvaTvVideo(yuvaTvIndex, { autoplay: yuvaTvStarted });
+}
+
+function stopYuvaTv() {
+  if (!yuvaTvReady || !yuvaTvPlayer) return;
+  const video = yuvaTvVideos[yuvaTvIndex];
+  if (video?.type === "file") yuvaTvPlayer.pause();
+  else yuvaTvPlayer.pauseVideo?.();
+  yuvaTvStarted = false;
+  updateYuvaTvStatus("durdu");
+  updateYuvaTvButtons();
+}
+
+function toggleYuvaTvMute() {
+  yuvaTvMuted = !yuvaTvMuted;
+  const video = yuvaTvVideos[yuvaTvIndex];
+  if (video?.type === "file" && yuvaTvPlayer) yuvaTvPlayer.muted = yuvaTvMuted;
+  else if (yuvaTvPlayer) {
+    if (yuvaTvMuted) yuvaTvPlayer.mute?.();
+    else yuvaTvPlayer.unMute?.();
+  }
+  updateYuvaTvButtons();
+}
+
+function setYuvaTvControlsDisabled(disabled) {
+  [yuvaTvPlayPause, yuvaTvMute, yuvaTvNext].forEach((button) => {
+    if (button) button.disabled = disabled;
+  });
+}
+
+function updateYuvaTvButtons() {
+  if (yuvaTvMute) yuvaTvMute.textContent = yuvaTvMuted ? "Ses Aç" : "Ses Kapat";
+  if (yuvaTvPlayPause) yuvaTvPlayPause.textContent = "Durdur";
+}
+
+function updateYuvaTvStatus(message) {
+  if (yuvaTvStatus) yuvaTvStatus.textContent = message;
+}
+
+function showYuvaTvMessage(message) {
+  if (!yuvaTvMessage) return;
+  yuvaTvMessage.textContent = message;
+  yuvaTvMessage.hidden = !message;
+}
+function openChatAdminLogin() {
+  if (!chatAdminDialog) return;
+  chatAdminMessage.textContent = "";
+  chatAdminDialog.showModal();
+  chatAdminEmail?.focus();
+}
+
+async function checkChatAdminState() {
+  try {
+    const response = await fetch("/api/chat/admin/me");
+    const data = await response.json();
+    chatIsAdmin = Boolean(data.isAdmin);
+  } catch (error) {
+    chatIsAdmin = false;
+  }
+}
+
+async function loginChatAdmin(event) {
+  event.preventDefault();
+  try {
+    const response = await fetch("/api/chat/admin/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email: chatAdminEmail.value.trim(),
+        password: chatAdminPassword.value,
+      }),
+    });
+    const data = await response.json();
+    if (!response.ok || !data.isAdmin) throw new Error(data.error || "Bu alana eri?im yetkin yok.");
+    chatIsAdmin = true;
+    chatAdminDialog.close();
+    showToast("Admin sohbet giri?i a??ld?.");
+    window.setTimeout(() => window.location.reload(), 800);
+  } catch (error) {
+    chatAdminMessage.textContent = error.message || "Bu alana eri?im yetkin yok.";
+  }
+}
+
 function bindEvents() {
   updateSoundToggleLabels();
 
@@ -586,7 +1672,7 @@ function bindEvents() {
     event.preventDefault();
     wishFormDialog.close();
     wishForm.reset();
-    showToast("Dileğin gökyüzünde kaldı.");
+    showToast("Dile?in g?ky?z?nde kald?.");
   });
 
   openLetterModal.addEventListener("click", () => {
@@ -596,12 +1682,12 @@ function bindEvents() {
     letterDialog.showModal();
     letterBody.focus();
   });
-  openLetterModal.addEventListener("pointerenter", playLetterHoverSound);
-  openLetterModal.addEventListener("pointerleave", stopLetterHoverSound);
+  if (window.matchMedia("(hover: hover) and (pointer: fine)").matches) {
+    openLetterModal.addEventListener("pointerenter", playLetterHoverSound);
+    openLetterModal.addEventListener("pointerleave", stopLetterHoverSound);
+  }
 
   closeLetterModal.addEventListener("click", () => letterDialog.close());
-  mainImageArea.addEventListener("pointerenter", playTreeSound);
-  mainImageArea.addEventListener("pointerleave", stopTreeSound);
   ribbonHotspot.addEventListener("click", () => {
     playEffectSound("ribbon");
     ribbonDialog.showModal();
@@ -639,7 +1725,7 @@ function bindEvents() {
 
   letterBody.addEventListener("input", () => {
     if (letterBody.value.trim().length >= 500) {
-      setLetterBodyMessage("Minimum 500 karakter yazmalısın.");
+      setLetterBodyMessage("Minimum 500 karakter yazmal?s?n.");
     }
   });
 
@@ -719,6 +1805,8 @@ function initDraggableBirds() {
   const orbit = document.querySelector(".memory-orbit");
   if (!orbit) return;
 
+  initBirdHitTesting();
+
   blueSquares.forEach((square) => {
     let dragOffsetX = 0;
     let dragOffsetY = 0;
@@ -727,6 +1815,11 @@ function initDraggableBirds() {
     let hasDragged = false;
 
     square.addEventListener("pointerdown", (event) => {
+      if (!isPointerOnOpaqueBird(event, square)) {
+        square.classList.remove("is-bird-hovered");
+        return;
+      }
+
       event.preventDefault();
 
       const orbitRect = orbit.getBoundingClientRect();
@@ -749,7 +1842,10 @@ function initDraggableBirds() {
     });
 
     square.addEventListener("pointermove", (event) => {
-      if (!square.classList.contains("is-dragging")) return;
+      if (!square.classList.contains("is-dragging")) {
+        square.classList.toggle("is-bird-hovered", isPointerOnOpaqueBird(event, square));
+        return;
+      }
 
       if (Math.hypot(event.clientX - pointerStartX, event.clientY - pointerStartY) > 8) {
         hasDragged = true;
@@ -781,7 +1877,94 @@ function initDraggableBirds() {
 
     square.addEventListener("pointerup", stopDragging);
     square.addEventListener("pointercancel", stopDragging);
+    square.addEventListener("pointerleave", () => {
+      if (!square.classList.contains("is-dragging")) square.classList.remove("is-bird-hovered");
+    });
   });
+}
+
+function initBirdHitTesting() {
+  if (birdHitContext) return;
+
+  birdHitCanvas = document.createElement("canvas");
+  birdHitContext = birdHitCanvas.getContext("2d", { willReadFrequently: true });
+  if (!birdHitContext) return;
+
+  const birdImage = new Image();
+  birdImage.decoding = "async";
+  birdImage.onload = () => prepareBirdHitCanvas(birdImage);
+  birdImage.onerror = () => {
+    const fallback = blueSquares[0]?.querySelector("img");
+    if (fallback?.complete && fallback.naturalWidth) prepareBirdHitCanvas(fallback);
+  };
+  birdImage.src = imageConfig.blueSquareImages[0] || "images/birdan-optimized.gif";
+}
+
+function prepareBirdHitCanvas(sourceImage) {
+  if (!birdHitContext || !sourceImage?.naturalWidth || !sourceImage?.naturalHeight) return;
+
+  birdHitSourceImage = sourceImage;
+  birdHitCanvas.width = sourceImage.naturalWidth;
+  birdHitCanvas.height = sourceImage.naturalHeight;
+  birdHitContext.clearRect(0, 0, birdHitCanvas.width, birdHitCanvas.height);
+
+  try {
+    birdHitContext.drawImage(sourceImage, 0, 0, birdHitCanvas.width, birdHitCanvas.height);
+    birdHitContext.getImageData(0, 0, 1, 1);
+    birdHitReady = true;
+  } catch (error) {
+    birdHitReady = false;
+  }
+}
+
+function getBirdPixelCoordinates(event, square) {
+  const image = square?.querySelector("img");
+  if (!image) return null;
+
+  const rect = image.getBoundingClientRect();
+  if (!rect.width || !rect.height) return null;
+  const sourceWidth = birdHitSourceImage?.naturalWidth || image.naturalWidth || 1920;
+  const sourceHeight = birdHitSourceImage?.naturalHeight || image.naturalHeight || 1080;
+
+  const relativeX = event.clientX - rect.left;
+  const relativeY = event.clientY - rect.top;
+  if (relativeX < 0 || relativeY < 0 || relativeX > rect.width || relativeY > rect.height) return null;
+
+  return {
+    x: Math.floor((relativeX / rect.width) * sourceWidth),
+    y: Math.floor((relativeY / rect.height) * sourceHeight),
+    normalizedX: relativeX / rect.width,
+    normalizedY: relativeY / rect.height,
+  };
+}
+
+function isPointerOnOpaqueBird(event, square) {
+  const point = getBirdPixelCoordinates(event, square);
+  if (!point) return false;
+
+  if (!birdHitReady || !birdHitContext || !birdHitCanvas) {
+    return isPointerInApproximateBirdShape(point);
+  }
+
+  try {
+    const safeX = Math.max(0, Math.min(birdHitCanvas.width - 1, point.x));
+    const safeY = Math.max(0, Math.min(birdHitCanvas.height - 1, point.y));
+    const alpha = birdHitContext.getImageData(safeX, safeY, 1, 1).data[3];
+    return alpha > BIRD_ALPHA_THRESHOLD || isPointerInApproximateBirdShape(point);
+  } catch (error) {
+    return isPointerInApproximateBirdShape(point);
+  }
+}
+
+function isPointerInApproximateBirdShape(point) {
+  const x = point.normalizedX;
+  const y = point.normalizedY;
+  const inBody = isPointInEllipse(x, y, 0.56, 0.56, 0.16, 0.17);
+  const inLeftWing = isPointInEllipse(x, y, 0.48, 0.48, 0.13, 0.13);
+  const inRightWing = isPointInEllipse(x, y, 0.66, 0.47, 0.13, 0.14);
+  const inTail = isPointInEllipse(x, y, 0.43, 0.62, 0.08, 0.11);
+
+  return inBody || inLeftWing || inRightWing || inTail;
 }
 
 function triggerBirdHop(square) {
@@ -806,13 +1989,11 @@ function initRoamingCat() {
     dragging: "images/catdragging.png",
   };
   const config = {
-    centerLeft: 0.29,
-    centerRight: 0.72,
     edgePadding: 18,
     offscreenPadding: 120,
     speedMin: 0.34,
     speedMax: 0.58,
-    laneYRatio: 0.75,
+    laneYRatio: 0.84,
     sitMin: 1800,
     sitMax: 5200,
     walkMin: 3600,
@@ -822,17 +2003,15 @@ function initRoamingCat() {
   };
 
   const catSize = () => roamingCat.getBoundingClientRect();
-  const centerBounds = () => ({
-    left: window.innerWidth * config.centerLeft,
-    right: window.innerWidth * config.centerRight,
-  });
+  const catWorldWidth = () => window.innerWidth * 2;
+  const pointerWorldX = (event) => event.clientX + getSceneViewportOffset();
   const laneY = () => {
     const rect = catSize();
     return Math.max(58, Math.min(window.innerHeight - rect.height - 18, window.innerHeight * config.laneYRatio));
   };
   const clampCat = () => {
     const rect = catSize();
-    catState.x = Math.max(-rect.width - config.offscreenPadding, Math.min(window.innerWidth + config.offscreenPadding, catState.x));
+    catState.x = Math.max(-rect.width - config.offscreenPadding, Math.min(catWorldWidth() + config.offscreenPadding, catState.x));
     catState.y = Math.max(58, Math.min(window.innerHeight - rect.height - 18, catState.y));
   };
   const setCatPosition = () => {
@@ -857,8 +2036,7 @@ function initRoamingCat() {
   };
   const randomSpeed = () => randomBetween(config.speedMin, config.speedMax);
   const currentSide = () => {
-    const bounds = centerBounds();
-    return catState.x < bounds.left ? "left" : "right";
+    return catState.x < catWorldWidth() / 2 ? "left" : "right";
   };
   const leftLandmarkEntryX = () => {
     const rect = catSize();
@@ -872,7 +2050,7 @@ function initRoamingCat() {
     catState.direction = side === "left" ? 1 : -1;
     catState.face = catState.direction;
     catState.y = laneY();
-    catState.x = side === "left" ? leftLandmarkEntryX() : window.innerWidth + randomBetween(14, 70);
+    catState.x = side === "left" ? leftLandmarkEntryX() : catWorldWidth() + randomBetween(14, 70);
   };
   const startWalking = (direction = catState.direction || 1) => {
     catState.direction = direction;
@@ -950,7 +2128,7 @@ function initRoamingCat() {
     catState.swingVelocity += catState.swingTarget * 0.095;
     catState.lastPointerX = event.clientX;
     catState.lastPointerTime = now;
-    catState.x = event.clientX - catState.dragOffsetX;
+    catState.x = pointerWorldX(event) - catState.dragOffsetX;
     catState.y = event.clientY - catState.dragOffsetY;
     clampCat();
     setCatPosition();
@@ -963,11 +2141,6 @@ function initRoamingCat() {
     stopCatSound();
     catState.swingTarget = 0;
     catState.side = currentSide();
-    const bounds = centerBounds();
-    if (catState.x > bounds.left && catState.x < bounds.right) {
-      const rect = catSize();
-      catState.x = catState.side === "left" ? bounds.left - rect.width - config.edgePadding : bounds.right + config.edgePadding;
-    }
     catState.falling = true;
     catState.fallDirection = catState.side === "left" ? (Math.random() > 0.5 ? -1 : 1) : (Math.random() > 0.5 ? 1 : -1);
     setCatMode("dragging");
@@ -1035,33 +2208,22 @@ function initRoamingCat() {
     if (catState.mode === "sitting") {
       if (now >= catState.sitUntil) {
         const side = currentSide();
-        const bounds = centerBounds();
-        const canMoveOutward = side === "left" ? catState.x > -catSize().width * 0.6 : catState.x < window.innerWidth - catSize().width * 0.4;
+        const canMoveOutward = side === "left" ? catState.x > -catSize().width * 0.6 : catState.x < catWorldWidth() - catSize().width * 0.4;
         const outward = side === "left" ? -1 : 1;
         const inward = side === "left" ? 1 : -1;
         startWalking(Math.random() > 0.46 && canMoveOutward ? outward : inward);
-        if (catState.x > bounds.left && catState.x < bounds.right) {
-          catState.direction = outward;
-        }
       }
     } else {
       const rect = catSize();
-      const bounds = centerBounds();
       catState.y = laneY();
       catState.x += catState.direction * catState.speed;
       catState.face = catState.direction;
 
-      if (catState.direction > 0 && catState.x + rect.width > bounds.left && catState.x < bounds.right) {
-        catState.x = bounds.left - rect.width - config.edgePadding;
-        startSitting();
-      } else if (catState.direction < 0 && catState.x < bounds.right && catState.x + rect.width > bounds.left) {
-        catState.x = bounds.right + config.edgePadding;
-        startSitting();
-      } else if (catState.x > window.innerWidth + config.offscreenPadding) {
+      if (catState.x > catWorldWidth() + config.offscreenPadding) {
         scheduleReentry("left");
       } else if (catState.x < -rect.width - config.offscreenPadding) {
         scheduleReentry("right");
-      } else if (now >= catState.walkUntil && catState.x > 0 && catState.x < window.innerWidth - rect.width) {
+      } else if (now >= catState.walkUntil && catState.x > 0 && catState.x < catWorldWidth() - rect.width) {
         startSitting();
       }
 
@@ -1077,7 +2239,7 @@ function initRoamingCat() {
 function updatePreview() {
   const selectedSticker = getSelectedSticker();
   syncHiddenChoices();
-  const body = letterBody.value.trim() || "Buraya içinden geçenleri yaz...";
+  const body = letterBody.value.trim() || "Buraya i?inden ge?enleri yaz...";
   const author = getBirdName();
 
   letterPreview.className = `letter-preview paper-${paperStyle.value} font-${fontStyle.value}`;
@@ -1127,20 +2289,20 @@ async function saveLetter() {
   };
 
   if (!payload.body) {
-    setLetterBodyMessage("Mektup boş olamaz.", true);
-    showToast("Mektup Boş Olamaz.");
+    setLetterBodyMessage("Mektup bo? olamaz.", true);
+    showToast("Mektup Bo? Olamaz.");
     letterBody.focus();
     return;
   }
 
   if (payload.body.length < 500) {
-    setLetterBodyMessage("Minimum 500 karakter yazmalısın.", true);
-    showToast("Minimum 500 Karakter yazmalısın.");
+    setLetterBodyMessage("Minimum 500 karakter yazmal?s?n.", true);
+    showToast("Minimum 500 Karakter yazmal?s?n.");
     letterBody.focus();
     return;
   }
 
-  setLetterBodyMessage("Minimum 500 karakter yazmalısın.");
+  setLetterBodyMessage("Minimum 500 karakter yazmal?s?n.");
 
   setLetterFormBusy(true);
 
@@ -1183,7 +2345,7 @@ async function saveLetter() {
     updatePreview();
     updateLetterCount();
     dropEnvelope(letter);
-    showToast("Mektubun Yuvaya Ulaştı.");
+    showToast("Mektubun Yuvaya Ula?t?.");
   } catch (error) {
     console.error("Letter could not be saved to the API.", error);
     showToast(getLetterSubmitErrorMessage(error));
@@ -1194,7 +2356,7 @@ async function saveLetter() {
 
 function updateLetterCount() {
   const total = getLetters().length;
-  letterCountLabel.textContent = `${total} - kişi yuvaya mektup bıraktı`;
+  letterCountLabel.textContent = `${total} - ki\u015fi yuvaya mektup b\u0131rakt\u0131`;
 }
 
 function renderEnvelopeStack(excludedId = "") {
@@ -1259,7 +2421,7 @@ function createEnvelopeElement(letter, index) {
 
   envelope.className = "envelope";
   envelope.tabIndex = 0;
-  envelope.setAttribute("aria-label", "Yuvaya bırakılmış mektup zarfı");
+  envelope.setAttribute("aria-label", "Yuvaya b?rak?lm?? mektup zarf?");
   envelope.addEventListener("click", showEnvelopeLockedMessage);
   envelope.addEventListener("keydown", (event) => {
     if (event.key === "Enter" || event.key === " ") {
@@ -1354,7 +2516,7 @@ function setLetterFormBusy(isBusy) {
   if (!sendButton) return;
 
   sendButton.disabled = isBusy;
-  sendButton.textContent = isBusy ? "Gönderiliyor..." : "Gönder";
+  sendButton.textContent = isBusy ? "G?nderiliyor..." : "G?nder";
 }
 
 function getSelectedSticker() {
@@ -1368,7 +2530,7 @@ function getSelectedRecipient() {
 }
 
 function getBirdName() {
-  if (anonymousBird.checked) return "anonim kuş";
+  if (anonymousBird.checked) return "anonim ku?";
   return birdName.value.trim();
 }
 
@@ -1392,7 +2554,7 @@ function setSelectedRadioValue(name, value) {
   if (target) target.checked = true;
 }
 
-function showToast(message = "Mektubun Yuvaya Ulaştı.") {
+function showToast(message = "Mektubun Yuvaya Ula?t?.") {
   window.clearTimeout(toastTimer);
   toast.textContent = message;
   toast.classList.add("is-visible");
@@ -1400,11 +2562,11 @@ function showToast(message = "Mektubun Yuvaya Ulaştı.") {
 }
 
 function getLetterSubmitErrorMessage(error) {
-  if (error?.status === 409) return "Bu mektup yakın zamanda gönderildi.";
-  if (error?.status === 429) return "Çok hızlı gönderim yapıldı, biraz sonra tekrar dene.";
-  if (String(error?.message || "").includes("500 characters")) return "Minimum 500 Karakter yazmalısın.";
-  if (String(error?.message || "").includes("little more time")) return "Göndermeden önce biraz daha bekle.";
-  return "Mektup Gönderilemedi, Tekrar Dene.";
+  if (error?.status === 409) return "Bu mektup yak?n zamanda g?nderildi.";
+  if (error?.status === 429) return "?ok h?zl? g?nderim yap?ld?, biraz sonra tekrar dene.";
+  if (String(error?.message || "").includes("500 characters")) return "Minimum 500 Karakter yazmal?s?n.";
+  if (String(error?.message || "").includes("little more time")) return "G?ndermeden ?nce biraz daha bekle.";
+  return "Mektup G?nderilemedi, Tekrar Dene.";
 }
 
 function setLetterBodyMessage(message, isError = false) {

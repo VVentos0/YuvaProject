@@ -2,14 +2,17 @@ require("dotenv").config();
 
 const path = require("path");
 const crypto = require("crypto");
+const http = require("http");
 const compression = require("compression");
 const cors = require("cors");
 const express = require("express");
 const rateLimit = require("express-rate-limit");
 const helmet = require("helmet");
 const mongoose = require("mongoose");
+const { Server } = require("socket.io");
 
 const app = express();
+const server = http.createServer(app);
 const port = Number(process.env.PORT || 3000);
 const mongoUri = process.env.MONGODB_URI || "mongodb://127.0.0.1:27017/yuva";
 const publicOrigin = process.env.PUBLIC_ORIGIN || "https://yuvarchive.com";
@@ -22,6 +25,23 @@ const adminToken = process.env.ADMIN_TOKEN || "";
 const adminUsername = process.env.ADMIN_USERNAME || "admin";
 const adminPassword = process.env.ADMIN_PASSWORD || "";
 const adminCookieName = "yuva_admin";
+const chatAdminCookieName = "yuva_chat_admin";
+const youtubeApiKey = process.env.YOUTUBE_API_KEY || "";
+const defaultYuvaTvChannelId = process.env.YUVA_TV_CHANNEL_ID || "UCKO9BV0HNxQs5wttm1g2vQA";
+
+const io = new Server(server, {
+  cors: {
+    origin(origin, callback) {
+      if (isAllowedOrigin(origin)) {
+        callback(null, true);
+        return;
+      }
+
+      callback(new Error("Origin not allowed"));
+    },
+  },
+  maxHttpBufferSize: 16 * 1024,
+});
 
 const allowedOrigins = new Set([
   publicOrigin,
@@ -108,19 +128,83 @@ const blockedIpSchema = new mongoose.Schema(
 
 const BlockedIp = mongoose.model("BlockedIp", blockedIpSchema);
 
+const chatMessageSchema = new mongoose.Schema(
+  {
+    nickname: { type: String, trim: true, maxlength: 32, default: "" },
+    text: { type: String, trim: true, maxlength: 300, default: "" },
+    userSessionId: { type: String, trim: true, maxlength: 96, default: "" },
+    userId: { type: String, trim: true, maxlength: 96, default: "" },
+    isAdmin: { type: Boolean, default: false },
+    approved: { type: Boolean, default: true },
+    deleted: { type: Boolean, default: false },
+    reported: { type: Boolean, default: false },
+    reportCount: { type: Number, default: 0 },
+    hidden: { type: Boolean, default: false },
+    type: { type: String, enum: ["user", "system"], default: "user" },
+    ipHash: { type: String, default: "" },
+  },
+  {
+    timestamps: { createdAt: true, updatedAt: true },
+    versionKey: false,
+  },
+);
+
+chatMessageSchema.index({ createdAt: -1 });
+chatMessageSchema.index({ reported: 1, createdAt: -1 });
+chatMessageSchema.index({ userSessionId: 1, createdAt: -1 });
+
+const ChatMessage = mongoose.model("ChatMessage", chatMessageSchema);
+
+const chatPresenceSchema = new mongoose.Schema(
+  {
+    userSessionId: { type: String, required: true, unique: true, trim: true, maxlength: 96 },
+    nickname: { type: String, trim: true, maxlength: 32, default: "" },
+    socketId: { type: String, trim: true, maxlength: 96, default: "" },
+    joinedAt: { type: Date, default: Date.now },
+    lastSeen: { type: Date, default: Date.now },
+  },
+  {
+    timestamps: true,
+    versionKey: false,
+  },
+);
+
+chatPresenceSchema.index({ lastSeen: 1 });
+
+const ChatPresence = mongoose.model("ChatPresence", chatPresenceSchema);
+
+const chatBanSchema = new mongoose.Schema(
+  {
+    userSessionId: { type: String, required: true, unique: true, trim: true, maxlength: 96 },
+    nickname: { type: String, trim: true, maxlength: 32, default: "" },
+    reason: { type: String, trim: true, maxlength: 160, default: "admin" },
+  },
+  {
+    timestamps: true,
+    versionKey: false,
+  },
+);
+
+const ChatBan = mongoose.model("ChatBan", chatBanSchema);
+
 app.set("trust proxy", 1);
 app.use(compression());
 app.use(
   helmet({
+    referrerPolicy: {
+      policy: "strict-origin-when-cross-origin",
+    },
     contentSecurityPolicy: {
       directives: {
         defaultSrc: ["'self'"],
         baseUri: ["'self'"],
-        connectSrc: ["'self'"],
+        connectSrc: ["'self'", "https://www.youtube.com", "https://www.googleapis.com"],
         fontSrc: ["'self'", "https://fonts.gstatic.com"],
-        imgSrc: ["'self'", "data:"],
+        frameSrc: ["'self'", "https://www.youtube.com", "https://www.youtube-nocookie.com"],
+        frameAncestors: ["'self'"],
+        imgSrc: ["'self'", "data:", "https://i.ytimg.com"],
         objectSrc: ["'none'"],
-        scriptSrc: ["'self'"],
+        scriptSrc: ["'self'", "https://www.youtube.com", "https://s.ytimg.com"],
         styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
       },
     },
@@ -284,6 +368,196 @@ function toAdminLetter(letter) {
   };
 }
 
+function toPublicChatMessage(message) {
+  return {
+    id: message._id.toString(),
+    nickname: message.nickname || "",
+    text: message.deleted ? "" : message.text,
+    createdAt: message.createdAt,
+    isAdmin: Boolean(message.isAdmin),
+    reported: Boolean(message.reported),
+    type: message.type || "user",
+  };
+}
+
+function toAdminChatMessage(message) {
+  return {
+    ...toPublicChatMessage(message),
+    text: message.text,
+    userSessionId: message.userSessionId || "",
+    userId: message.userId || "",
+    approved: Boolean(message.approved),
+    deleted: Boolean(message.deleted),
+    hidden: Boolean(message.hidden),
+    reportCount: Number(message.reportCount || 0),
+    updatedAt: message.updatedAt,
+  };
+}
+
+function normalizeChatNickname(value) {
+  return String(value || "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 32);
+}
+
+function normalizeChatText(value) {
+  return String(value || "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 300);
+}
+
+function normalizeSessionId(value) {
+  const sessionId = String(value || "").trim();
+  if (/^[a-zA-Z0-9_-]{12,96}$/.test(sessionId)) return sessionId;
+  return crypto.randomUUID();
+}
+
+function getVisibleChatQuery() {
+  return {
+    approved: true,
+    deleted: false,
+    hidden: false,
+  };
+}
+
+const blockedChatPatterns = [
+  /\b(o[cç]|orospu|siktir|amk|aq|pi[cç]|g[oö]t|yarrak|salak|aptal|gerizekal[ıi])\b/i,
+  /\b(kill yourself|kys|die|threat|doxx)\b/i,
+  /\b(sedo|iro|sedo'nun|iro'nun).{0,40}\b(aptal|salak|gerizekal[ıi]|nefret|[oö]l)\b/i,
+];
+
+function isBlockedChatText(text) {
+  const normalized = String(text || "").toLocaleLowerCase("tr-TR");
+  return blockedChatPatterns.some((pattern) => pattern.test(normalized));
+}
+
+async function createChatSystemMessage(text) {
+  const message = await ChatMessage.create({
+    type: "system",
+    nickname: "YUVA",
+    text,
+    approved: true,
+  });
+  const payload = toPublicChatMessage(message);
+  io.emit("chat:message", payload);
+  return payload;
+}
+
+async function createUserChatMessage({ nickname, text, userSessionId, isAdmin = false, ipHash = "" }) {
+  const normalizedNickname = normalizeChatNickname(nickname);
+  const normalizedText = normalizeChatText(text);
+
+  if (!normalizedNickname) {
+    const error = new Error("Nickname is required");
+    error.status = 400;
+    throw error;
+  }
+
+  if (!normalizedText) {
+    const error = new Error("Boş mesaj gönderilemez.");
+    error.status = 400;
+    throw error;
+  }
+
+  if (isBlockedChatText(normalizedText)) {
+    const error = new Error("Bu mesaj YUVA'nın sakin alanına uygun değil.");
+    error.status = 400;
+    throw error;
+  }
+
+  const sessionId = normalizeSessionId(userSessionId);
+  const ban = await ChatBan.findOne({ userSessionId: sessionId }).select("_id").lean();
+  if (ban) {
+    const error = new Error("Bu sohbet alanına erişimin kapalı.");
+    error.status = 403;
+    throw error;
+  }
+
+  const now = Date.now();
+  const lastSentAt = chatSendTimes.get(sessionId) || 0;
+  if (now - lastSentAt < 3000) {
+    const error = new Error("Biraz yavaş canım");
+    error.status = 429;
+    throw error;
+  }
+
+  chatSendTimes.set(sessionId, now);
+  const message = await ChatMessage.create({
+    nickname: normalizedNickname,
+    text: normalizedText,
+    userSessionId: sessionId,
+    userId: isAdmin ? adminUsername : "",
+    isAdmin: Boolean(isAdmin),
+    ipHash,
+  });
+  const publicMessage = toPublicChatMessage(message);
+  io.to("yuva-chat").emit("chat:message", publicMessage);
+  return publicMessage;
+}
+
+async function getOnlineCount() {
+  const cutoff = new Date(Date.now() - 60 * 1000);
+  await ChatPresence.deleteMany({ lastSeen: { $lt: cutoff } });
+  return ChatPresence.countDocuments({ lastSeen: { $gte: cutoff } });
+}
+
+async function broadcastPresence() {
+  const cutoff = new Date(Date.now() - 60 * 1000);
+  await ChatPresence.deleteMany({ lastSeen: { $lt: cutoff } });
+  const users = await ChatPresence.find({ lastSeen: { $gte: cutoff } })
+    .sort({ joinedAt: 1 })
+    .select("nickname userSessionId joinedAt lastSeen")
+    .lean();
+  io.emit("chat:presence", {
+    onlineCount: users.length,
+    users: users.map((user) => ({
+      nickname: user.nickname,
+      userSessionId: user.userSessionId,
+      joinedAt: user.joinedAt,
+      lastSeen: user.lastSeen,
+    })),
+  });
+}
+
+function getChatAdminCookieValue() {
+  const secret = adminToken || adminPassword;
+  if (!secret || !adminPassword) return "";
+  return crypto.createHmac("sha256", secret).update(`chat:${adminUsername}:${adminPassword}`).digest("hex");
+}
+
+function isChatAdminAuthorized(req) {
+  const cookies = parseCookies(req);
+  const cookieValue = getChatAdminCookieValue();
+  return Boolean(cookieValue && safeEqual(cookies[chatAdminCookieName] || "", cookieValue));
+}
+
+function isSocketChatAdmin(socket) {
+  const cookies = Object.fromEntries(
+    String(socket.handshake.headers.cookie || "")
+      .split(";")
+      .map((cookie) => cookie.trim())
+      .filter(Boolean)
+      .map((cookie) => {
+        const index = cookie.indexOf("=");
+        if (index === -1) return [cookie, ""];
+        return [cookie.slice(0, index), decodeURIComponent(cookie.slice(index + 1))];
+      }),
+  );
+  const cookieValue = getChatAdminCookieValue();
+  return Boolean(cookieValue && safeEqual(cookies[chatAdminCookieName] || "", cookieValue));
+}
+
+function requireChatAdmin(req, res, next) {
+  if (isChatAdminAuthorized(req) || isAdminAuthorized(req)) {
+    next();
+    return;
+  }
+
+  res.status(401).json({ error: "Unauthorized" });
+}
+
 function getClientIp(req) {
   const forwardedFor = String(req.get("x-forwarded-for") || "")
     .split(",")
@@ -389,6 +663,49 @@ function safeEqual(actual, expected) {
   }
 
   return crypto.timingSafeEqual(actualBuffer, expectedBuffer);
+}
+
+function sanitizeYouTubeId(value, maxLength = 64) {
+  return String(value || "")
+    .trim()
+    .replace(/[^a-zA-Z0-9_-]/g, "")
+    .slice(0, maxLength);
+}
+
+async function fetchJson(url) {
+  const response = await fetch(url, {
+    headers: { Accept: "application/json" },
+  });
+  if (!response.ok) throw new Error(`YouTube request failed: ${response.status}`);
+  return response.json();
+}
+
+async function fetchText(url) {
+  const response = await fetch(url, {
+    headers: { Accept: "application/xml,text/xml,text/plain" },
+  });
+  if (!response.ok) throw new Error(`YouTube feed failed: ${response.status}`);
+  return response.text();
+}
+
+async function fetchYuvaTvVideosFromDataApi(channelId) {
+  const searchUrl = new URL("https://www.googleapis.com/youtube/v3/search");
+  searchUrl.searchParams.set("key", youtubeApiKey);
+  searchUrl.searchParams.set("channelId", channelId);
+  searchUrl.searchParams.set("part", "id");
+  searchUrl.searchParams.set("order", "date");
+  searchUrl.searchParams.set("type", "video");
+  searchUrl.searchParams.set("maxResults", "50");
+
+  const data = await fetchJson(searchUrl);
+  return [...new Set((data.items || []).map((item) => sanitizeYouTubeId(item.id?.videoId, 24)).filter(Boolean))];
+}
+
+async function fetchYuvaTvVideosFromFeed(channelId) {
+  const feedUrl = new URL("https://www.youtube.com/feeds/videos.xml");
+  feedUrl.searchParams.set("channel_id", channelId);
+  const xml = await fetchText(feedUrl);
+  return [...new Set(Array.from(xml.matchAll(/<yt:videoId>([^<]+)<\/yt:videoId>/g)).map((match) => sanitizeYouTubeId(match[1], 24)).filter(Boolean))];
 }
 
 function requireAdminPage(req, res, next) {
@@ -580,6 +897,247 @@ app.post("/api/letters", writeBurstLimiter, writeLimiter, writeHourlyLimiter, as
   }
 });
 
+app.get("/api/chat/messages", async (req, res, next) => {
+  try {
+    const limit = Math.min(Math.max(Number(req.query.limit || 50), 1), 50);
+    const before = String(req.query.before || "");
+    const query = getVisibleChatQuery();
+
+    if (mongoose.Types.ObjectId.isValid(before)) {
+      const beforeMessage = await ChatMessage.findById(before).select("createdAt").lean();
+      if (beforeMessage?.createdAt) {
+        query.createdAt = { $lt: beforeMessage.createdAt };
+      }
+    }
+
+    const messages = await ChatMessage.find(query).sort({ createdAt: -1 }).limit(limit).lean(false);
+    res.json({
+      messages: messages.reverse().map(toPublicChatMessage),
+      onlineCount: await getOnlineCount(),
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/chat/messages", async (req, res, next) => {
+  try {
+    const userSessionId = normalizeSessionId(req.body?.userSessionId);
+    const ipHash = hashIp(getClientIp(req));
+    const message = await createUserChatMessage({
+      nickname: req.body?.nickname,
+      text: req.body?.text,
+      userSessionId,
+      isAdmin: isChatAdminAuthorized(req) || isAdminAuthorized(req),
+      ipHash,
+    });
+
+    await ChatPresence.findOneAndUpdate(
+      { userSessionId },
+      {
+        $set: {
+          userSessionId,
+          nickname: normalizeChatNickname(req.body?.nickname),
+          lastSeen: new Date(),
+        },
+        $setOnInsert: { joinedAt: new Date() },
+      },
+      { upsert: true, setDefaultsOnInsert: true },
+    );
+    await broadcastPresence();
+    res.status(201).json({ message });
+  } catch (error) {
+    if (error.status) {
+      res.status(error.status).json({ error: error.message });
+      return;
+    }
+    next(error);
+  }
+});
+
+app.post("/api/chat/report/:id", async (req, res, next) => {
+  try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      res.status(404).json({ error: "Message not found" });
+      return;
+    }
+
+    const message = await ChatMessage.findOneAndUpdate(
+      { _id: req.params.id, deleted: false },
+      {
+        $set: { reported: true },
+        $inc: { reportCount: 1 },
+      },
+      { new: true },
+    );
+
+    if (!message) {
+      res.status(404).json({ error: "Message not found" });
+      return;
+    }
+
+    if (message.reportCount >= 3) {
+      message.hidden = true;
+      await message.save();
+      io.emit("chat:moderated", { id: message._id.toString(), hidden: true });
+    }
+
+    res.json({ ok: true });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/chat/admin/login", loginLimiter, (req, res) => {
+  const email = String(req.body?.email || "").trim();
+  const password = String(req.body?.password || "");
+  const configuredEmail = String(process.env.ADMIN_EMAIL || adminUsername || "").trim();
+  const emailMatches = Boolean(configuredEmail && safeEqual(email, configuredEmail));
+
+  if (!adminPassword || !emailMatches || !safeEqual(password, adminPassword)) {
+    res.status(403).json({ error: "Bu alana erişim yetkin yok." });
+    return;
+  }
+
+  res.cookie(chatAdminCookieName, getChatAdminCookieValue(), {
+    httpOnly: true,
+    maxAge: 24 * 60 * 60 * 1000,
+    sameSite: "lax",
+    secure: req.secure || req.get("x-forwarded-proto") === "https",
+  });
+  res.json({ isAdmin: true, displayName: adminUsername, email: configuredEmail });
+});
+
+app.post("/api/chat/admin/logout", (req, res) => {
+  res.clearCookie(chatAdminCookieName);
+  res.json({ ok: true });
+});
+
+app.get("/api/chat/admin/me", (req, res) => {
+  res.json({
+    isAdmin: isChatAdminAuthorized(req) || isAdminAuthorized(req),
+  });
+});
+
+app.get("/api/yuva-tv/videos", async (req, res, next) => {
+  try {
+    const channelId = sanitizeYouTubeId(req.query.channelId || defaultYuvaTvChannelId, 64);
+    const videoIds = youtubeApiKey
+      ? await fetchYuvaTvVideosFromDataApi(channelId)
+      : await fetchYuvaTvVideosFromFeed(channelId);
+
+    res.json({ channelId, videoIds });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/admin/chat/messages", requireConfiguredAdmin, async (req, res, next) => {
+  try {
+    const filter = String(req.query.filter || "");
+    const query = filter === "reported" ? { reported: true } : {};
+    const messages = await ChatMessage.find(query).sort({ createdAt: -1 }).limit(200).lean(false);
+    res.json({ messages: messages.map(toAdminChatMessage) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.patch("/api/admin/chat/messages/:id", requireConfiguredAdmin, async (req, res, next) => {
+  try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      res.status(404).json({ error: "Message not found" });
+      return;
+    }
+
+    const patch = {};
+    if (Object.prototype.hasOwnProperty.call(req.body || {}, "hidden")) patch.hidden = Boolean(req.body.hidden);
+    if (Object.prototype.hasOwnProperty.call(req.body || {}, "approved")) patch.approved = Boolean(req.body.approved);
+    if (Object.prototype.hasOwnProperty.call(req.body || {}, "reported")) patch.reported = Boolean(req.body.reported);
+    if (Object.prototype.hasOwnProperty.call(req.body || {}, "deleted")) patch.deleted = Boolean(req.body.deleted);
+
+    const message = await ChatMessage.findByIdAndUpdate(req.params.id, patch, { new: true });
+    if (!message) {
+      res.status(404).json({ error: "Message not found" });
+      return;
+    }
+
+    io.emit("chat:moderated", toPublicChatMessage(message));
+    res.json(toAdminChatMessage(message));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.delete("/api/admin/chat/messages/:id", requireConfiguredAdmin, async (req, res, next) => {
+  try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      res.status(404).json({ error: "Message not found" });
+      return;
+    }
+
+    const message = await ChatMessage.findByIdAndUpdate(req.params.id, { deleted: true }, { new: true });
+    if (!message) {
+      res.status(404).json({ error: "Message not found" });
+      return;
+    }
+
+    io.emit("chat:moderated", { id: message._id.toString(), deleted: true });
+    res.status(204).end();
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.delete("/api/admin/chat/messages/by-session/:userSessionId", requireConfiguredAdmin, async (req, res, next) => {
+  try {
+    const userSessionId = String(req.params.userSessionId || "").trim();
+    if (!/^[a-zA-Z0-9_-]{12,96}$/.test(userSessionId)) {
+      res.status(400).json({ error: "Invalid session" });
+      return;
+    }
+
+    const messages = await ChatMessage.find({ userSessionId }).select("_id").lean();
+    const result = await ChatMessage.updateMany({ userSessionId }, { $set: { deleted: true, hidden: true } });
+    messages.forEach((message) => {
+      io.emit("chat:moderated", { id: message._id.toString(), deleted: true });
+    });
+    res.json({ deletedCount: result.modifiedCount || 0 });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/admin/chat/bans", requireConfiguredAdmin, async (req, res, next) => {
+  try {
+    const userSessionId = normalizeSessionId(req.body?.userSessionId);
+    const nickname = normalizeChatNickname(req.body?.nickname);
+    const reason = String(req.body?.reason || "admin").trim().slice(0, 160);
+    const ban = await ChatBan.findOneAndUpdate(
+      { userSessionId },
+      { $set: { userSessionId, nickname, reason } },
+      { new: true, upsert: true, setDefaultsOnInsert: true },
+    ).lean();
+
+    await ChatPresence.deleteOne({ userSessionId });
+    io.emit("chat:banned", { userSessionId });
+    await broadcastPresence();
+    res.status(201).json(ban);
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/admin/chat/presence", requireConfiguredAdmin, async (req, res, next) => {
+  try {
+    const cutoff = new Date(Date.now() - 60 * 1000);
+    const users = await ChatPresence.find({ lastSeen: { $gte: cutoff } }).sort({ joinedAt: 1 }).lean();
+    res.json({ users });
+  } catch (error) {
+    next(error);
+  }
+});
+
 app.get("/api/admin/letters", requireConfiguredAdmin, async (req, res, next) => {
   try {
     const limit = Math.min(Math.max(Number(req.query.limit || 200), 1), 1000);
@@ -741,6 +1299,110 @@ app.get("*", (req, res) => {
   res.sendFile(path.join(__dirname, "index.html"));
 });
 
+const chatSendTimes = new Map();
+const socketSessions = new Map();
+
+io.on("connection", (socket) => {
+  socket.on("chat:join", async (payload = {}, ack) => {
+    try {
+      const nickname = normalizeChatNickname(payload.nickname);
+      const userSessionId = normalizeSessionId(payload.userSessionId);
+      const isAdmin = isSocketChatAdmin(socket);
+
+      if (!nickname) {
+        ack?.({ ok: false, error: "Nickname is required" });
+        return;
+      }
+
+      const ban = await ChatBan.findOne({ userSessionId }).select("_id").lean();
+      if (ban) {
+        ack?.({ ok: false, error: "Bu sohbet alanına erişimin kapalı." });
+        return;
+      }
+
+      await ChatPresence.findOneAndUpdate(
+        { userSessionId },
+        {
+          $set: {
+            userSessionId,
+            nickname,
+            socketId: socket.id,
+            lastSeen: new Date(),
+          },
+          $setOnInsert: { joinedAt: new Date() },
+        },
+        { upsert: true, setDefaultsOnInsert: true },
+      );
+
+      socketSessions.set(socket.id, { userSessionId, nickname, isAdmin });
+      socket.join("yuva-chat");
+      ack?.({ ok: true, userSessionId, isAdmin });
+      await createChatSystemMessage("birisi yuvaya katıldı.");
+      await broadcastPresence();
+    } catch (error) {
+      console.error(error);
+      ack?.({ ok: false, error: "Sohbete katılamadın." });
+    }
+  });
+
+  socket.on("chat:typing", async (payload = {}) => {
+    const session = socketSessions.get(socket.id);
+    if (!session) return;
+    socket.to("yuva-chat").emit("chat:typing", {
+      userSessionId: session.userSessionId,
+      typing: Boolean(payload.typing),
+    });
+  });
+
+  socket.on("chat:heartbeat", async () => {
+    const session = socketSessions.get(socket.id);
+    if (!session) return;
+    await ChatPresence.updateOne({ userSessionId: session.userSessionId }, { $set: { lastSeen: new Date(), socketId: socket.id } });
+    await broadcastPresence();
+  });
+
+  socket.on("chat:send", async (payload = {}, ack) => {
+    try {
+      const session = socketSessions.get(socket.id);
+      if (!session) {
+        ack?.({ ok: false, error: "Önce sohbete katıl." });
+        return;
+      }
+
+      const ipHash = hashIp(getClientIp({ get: (name) => socket.handshake.headers[String(name).toLowerCase()] || "", ip: socket.handshake.address, socket }));
+      const publicMessage = await createUserChatMessage({
+        nickname: session.nickname,
+        text: payload.text,
+        userSessionId: session.userSessionId,
+        isAdmin: Boolean(session.isAdmin),
+        ipHash,
+      });
+      ack?.({ ok: true, message: publicMessage });
+    } catch (error) {
+      console.error(error);
+      ack?.({ ok: false, error: error.status ? error.message : "Mesaj gönderilemedi." });
+    }
+  });
+
+  socket.on("disconnect", async () => {
+    const session = socketSessions.get(socket.id);
+    socketSessions.delete(socket.id);
+    if (!session) return;
+
+    try {
+      await ChatPresence.deleteOne({ userSessionId: session.userSessionId, socketId: socket.id });
+      await createChatSystemMessage("birisi sessizce uçtu.");
+      await broadcastPresence();
+    } catch (error) {
+      console.error(error);
+    }
+  });
+});
+
+setInterval(() => {
+  broadcastPresence().catch((error) => console.error(error));
+}, 30 * 1000);
+
 app.use((error, req, res, next) => {
   console.error(error);
 
@@ -759,7 +1421,7 @@ app.use((error, req, res, next) => {
 
 async function start() {
   await mongoose.connect(mongoUri);
-  app.listen(port, () => {
+  server.listen(port, () => {
     console.log(`YUVA server is listening on ${port}`);
   });
 }

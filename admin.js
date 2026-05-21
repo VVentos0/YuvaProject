@@ -5,7 +5,13 @@ const countLabel = document.querySelector("#count");
 const sedoCountLabel = document.querySelector("#sedoCount");
 const iroCountLabel = document.querySelector("#iroCount");
 const lettersRoot = document.querySelector("#letters");
+const refreshChat = document.querySelector("#refreshChat");
+const reportedChat = document.querySelector("#reportedChat");
+const allChat = document.querySelector("#allChat");
+const chatStatus = document.querySelector("#chatStatus");
+const chatModeration = document.querySelector("#chatModeration");
 let allLetters = [];
+let chatFilter = "";
 
 async function loadLetters() {
   const params = new URLSearchParams({ limit: "500" });
@@ -257,6 +263,154 @@ async function blockIp(letter) {
   }
 }
 
+async function loadChatModeration() {
+  if (!chatModeration) return;
+  chatStatus.textContent = "Yükleniyor...";
+
+  try {
+    const params = new URLSearchParams();
+    if (chatFilter) params.set("filter", chatFilter);
+    const response = await fetch(`/api/admin/chat/messages?${params.toString()}`);
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const data = await response.json();
+    renderChatModeration(data.messages || []);
+    chatStatus.textContent = "Güncel";
+  } catch (error) {
+    console.error(error);
+    chatStatus.textContent = "Sohbet yüklenemedi";
+  }
+}
+
+function renderChatModeration(messages) {
+  chatModeration.innerHTML = "";
+  if (!messages.length) {
+    chatModeration.innerHTML = '<div class="empty">Sohbet kaydı bulunamadı.</div>';
+    return;
+  }
+
+  messages.forEach((message) => {
+    const article = document.createElement("article");
+    const meta = document.createElement("div");
+    const body = document.createElement("p");
+    const actions = document.createElement("div");
+    const hideButton = document.createElement("button");
+    const approveButton = document.createElement("button");
+    const deleteButton = document.createElement("button");
+    const banButton = document.createElement("button");
+    const clearSpamButton = document.createElement("button");
+
+    meta.className = "meta";
+    body.className = "body";
+    actions.className = "letter-actions";
+    meta.append(
+      makeMeta(`${message.nickname || "YUVA"}${message.isAdmin ? " (admin)" : ""}`),
+      makeMeta(formatDate(message.createdAt)),
+      makeMeta(`reported: ${message.reportCount || 0}`),
+      makeMeta(`session: ${message.userSessionId || "-"}`),
+      makeMeta(message.hidden ? "gizli" : "görünür"),
+    );
+    body.textContent = message.text || "";
+
+    hideButton.type = "button";
+    hideButton.className = "ghost-button";
+    hideButton.textContent = message.hidden ? "Göster" : "Gizle";
+    hideButton.addEventListener("click", () => updateChatMessage(message.id, { hidden: !message.hidden }));
+
+    approveButton.type = "button";
+    approveButton.className = "ghost-button";
+    approveButton.textContent = message.approved ? "Onayı Kaldır" : "Onayla";
+    approveButton.addEventListener("click", () => updateChatMessage(message.id, { approved: !message.approved }));
+
+    deleteButton.type = "button";
+    deleteButton.className = "danger-button";
+    deleteButton.textContent = "Sil";
+    deleteButton.addEventListener("click", () => deleteChatMessage(message.id));
+
+    actions.append(hideButton, approveButton, deleteButton);
+
+    if (message.userSessionId) {
+      clearSpamButton.type = "button";
+      clearSpamButton.className = "danger-button";
+      clearSpamButton.textContent = "Spamı Temizle";
+      clearSpamButton.addEventListener("click", () => clearChatSpam(message));
+
+      banButton.type = "button";
+      banButton.className = "danger-button";
+      banButton.textContent = "Session Ban";
+      banButton.addEventListener("click", () => banChatUser(message));
+      actions.append(clearSpamButton, banButton);
+    }
+
+    article.append(meta, body, actions);
+    chatModeration.append(article);
+  });
+}
+
+async function updateChatMessage(id, payload) {
+  chatStatus.textContent = "Kaydediliyor...";
+  try {
+    const response = await fetch(`/api/admin/chat/messages/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    await loadChatModeration();
+  } catch (error) {
+    console.error(error);
+    chatStatus.textContent = "Kaydedilemedi";
+  }
+}
+
+async function deleteChatMessage(id) {
+  if (!window.confirm("Bu sohbet mesajı silinsin mi?")) return;
+  chatStatus.textContent = "Siliniyor...";
+  try {
+    const response = await fetch(`/api/admin/chat/messages/${id}`, { method: "DELETE" });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    await loadChatModeration();
+  } catch (error) {
+    console.error(error);
+    chatStatus.textContent = "Silinemedi";
+  }
+}
+
+async function banChatUser(message) {
+  if (!window.confirm(`${message.nickname || "Bu kullanıcı"} sohbetten engellensin mi?`)) return;
+  chatStatus.textContent = "Engelleniyor...";
+  try {
+    const response = await fetch("/api/admin/chat/bans", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        userSessionId: message.userSessionId,
+        nickname: message.nickname,
+        reason: "admin panel",
+      }),
+    });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    chatStatus.textContent = "Engellendi";
+  } catch (error) {
+    console.error(error);
+    chatStatus.textContent = "Engellenemedi";
+  }
+}
+
+async function clearChatSpam(message) {
+  if (!window.confirm(`${message.nickname || "Bu session"} için tüm sohbet mesajları gizlensin mi?`)) return;
+  chatStatus.textContent = "Spam temizleniyor...";
+  try {
+    const response = await fetch(`/api/admin/chat/messages/by-session/${encodeURIComponent(message.userSessionId)}`, {
+      method: "DELETE",
+    });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    await loadChatModeration();
+  } catch (error) {
+    console.error(error);
+    chatStatus.textContent = "Spam temizlenemedi";
+  }
+}
+
 function makeMeta(text, className = "") {
   const span = document.createElement("span");
   span.textContent = text;
@@ -273,5 +427,15 @@ function formatDate(value) {
 
 recipient.addEventListener("change", renderLetters);
 refresh.addEventListener("click", loadLetters);
+refreshChat?.addEventListener("click", loadChatModeration);
+reportedChat?.addEventListener("click", () => {
+  chatFilter = "reported";
+  loadChatModeration();
+});
+allChat?.addEventListener("click", () => {
+  chatFilter = "";
+  loadChatModeration();
+});
 
 loadLetters();
+loadChatModeration();

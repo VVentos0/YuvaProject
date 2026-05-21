@@ -2,6 +2,7 @@
 <html lang="tr">
   <head>
     <meta charset="utf-8" />
+    <meta name="referrer" content="strict-origin-when-cross-origin" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>YUVA</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -14,11 +15,74 @@
       href="https://fonts.googleapis.com/css2?family=Jersey+15&family=Pixelify+Sans:wght@500;600;700&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="style.css?v=20260520-shooting-star" />
+    <link rel="stylesheet" href="style.css?v=20260521-yuvatv-player-only" />
   </head>
   <body>
-    <canvas class="atmosphere-canvas" id="atmosphereCanvas" aria-hidden="true"></canvas>
-    <div class="shooting-star-layer" id="shootingStarLayer" aria-hidden="true"></div>
+    <div class="sliding-world" id="slidingWorld">
+      <canvas class="atmosphere-canvas" id="atmosphereCanvas" aria-hidden="true"></canvas>
+      <div class="shooting-star-layer" id="shootingStarLayer" aria-hidden="true"></div>
+      <section class="world-scene world-scene--main" aria-label="Ana YUVA sahnesi">
+        <main class="yuva-stage" aria-label="YUVA dijital anı alanı">
+          <section class="main-image-area safe-zone" id="treeHitArea" aria-label="Ana anı görseli">
+            <img class="main-tree-base" id="mainAnimatedImage" alt="Ana anı görseli" />
+            <div class="main-tree-breath-layer" aria-hidden="true">
+              <img id="mainAnimatedTopImage" alt="" />
+            </div>
+          </section>
+
+          <section class="envelope-garden" id="envelopeGarden" aria-label="Yuvaya ulaşan zarflar"></section>
+
+          <button class="ribbon-hotspot" id="ribbonHotspot" type="button" aria-label="Kurdele notunu oku"></button>
+          <button class="ornament-hotspot ornament-hotspot--star" id="starHotspot" type="button" aria-label="Yıldız notunu oku"></button>
+          <button class="ornament-hotspot ornament-hotspot--cd" id="cdHotspot" type="button" aria-label="CD notunu oku"></button>
+
+          <section class="memory-orbit" aria-label="Dağınık anı görselleri">
+            <div class="blue-square" tabindex="0"><img alt="Anı görseli 1" /></div>
+            <div class="blue-square" tabindex="0"><img alt="Anı görseli 2" /></div>
+            <div class="blue-square" tabindex="0"><img alt="Anı görseli 3" /></div>
+            <div class="blue-square" tabindex="0"><img alt="Anı görseli 4" /></div>
+            <div class="blue-square" tabindex="0"><img alt="Anı görseli 5" /></div>
+            <div class="blue-square" tabindex="0"><img alt="Anı görseli 6" /></div>
+          </section>
+
+          <button class="write-button safe-zone" id="openLetterModal" type="button" aria-label="Mektup Yaz">
+            <span>Mektup Yaz</span>
+          </button>
+        </main>
+
+
+        <img class="scene-sign" src="images/sign.png" alt="" aria-hidden="true" />
+
+      </section>
+
+      <section class="world-scene world-scene--right" aria-label="YUVA sağ sahne">
+        <img class="right-scene-curtain" src="images/curtain.png" alt="" aria-hidden="true" draggable="false" />
+        <section class="yuva-tv" id="yuvaTv" aria-label="YUVA TV">
+          <div class="yuva-tv-frame">
+            <header class="yuva-tv-head">
+              <span>YUVA TV</span>
+              <span class="yuva-tv-status" id="yuvaTvStatus">hazır</span>
+            </header>
+            <div class="yuva-tv-screen" id="yuvaTvScreen">
+              <div class="yuva-tv-player" id="yuvaTvPlayer"></div>
+              <p class="yuva-tv-message" id="yuvaTvMessage">Başlat</p>
+            </div>
+          </div>
+        </section>
+        <img class="right-scene-people" src="images/people.gif" alt="" aria-hidden="true" draggable="false" />
+        <img class="right-scene-fire" src="images/fire.gif" alt="" aria-hidden="true" draggable="false" />
+        <div class="right-scene-placeholder" aria-hidden="true"></div>
+      </section>
+
+      <button class="roaming-cat" id="roamingCat" type="button" aria-label="Sayfada gezen beyaz kedi">
+        <span class="cat-shadow" aria-hidden="true"></span>
+        <img class="cat-sprite" id="catSprite" src="images/catwalking.gif" alt="" draggable="false" />
+      </button>
+    </div>
+
+    <button class="scene-arrow scene-arrow--right has-fallback" id="sceneArrowRight" type="button" aria-label="Sağ sahneye geç"></button>
+    <button class="scene-arrow scene-arrow--left has-fallback" id="sceneArrowLeft" type="button" aria-label="Ana sahneye dön" hidden></button>
+
     <section class="welcome-screen" id="welcomeScreen" aria-label="YUVA giriş mesajı">
       <div class="welcome-content">
         <h1>YUVA</h1>
@@ -47,44 +111,41 @@
       </div>
       <div class="corner-label corner-label--right" id="letterCountLabel" aria-label="Gönderilen mektup sayısı"></div>
 
-      <main class="yuva-stage" aria-label="YUVA dijital anı alanı">
-        <section class="main-image-area safe-zone" aria-label="Ana anı görseli">
-          <img class="main-tree-base" id="mainAnimatedImage" alt="Ana anı görseli" />
-          <div class="main-tree-breath-layer" aria-hidden="true">
-            <img id="mainAnimatedTopImage" alt="" />
-          </div>
-        </section>
-
-        <section class="envelope-garden" id="envelopeGarden" aria-label="Yuvaya ulaşan zarflar"></section>
-
-        <button class="ribbon-hotspot" id="ribbonHotspot" type="button" aria-label="Kurdele notunu oku"></button>
-        <button class="ornament-hotspot ornament-hotspot--star" id="starHotspot" type="button" aria-label="Yıldız notunu oku"></button>
-        <button class="ornament-hotspot ornament-hotspot--cd" id="cdHotspot" type="button" aria-label="CD notunu oku"></button>
-
-        <section class="memory-orbit" aria-label="Dağınık anı görselleri">
-          <div class="blue-square" tabindex="0"><img alt="Anı görseli 1" /></div>
-          <div class="blue-square" tabindex="0"><img alt="Anı görseli 2" /></div>
-          <div class="blue-square" tabindex="0"><img alt="Anı görseli 3" /></div>
-          <div class="blue-square" tabindex="0"><img alt="Anı görseli 4" /></div>
-          <div class="blue-square" tabindex="0"><img alt="Anı görseli 5" /></div>
-          <div class="blue-square" tabindex="0"><img alt="Anı görseli 6" /></div>
-        </section>
-
-        <button class="write-button safe-zone" id="openLetterModal" type="button" aria-label="Mektup Yaz">
-          <span>Mektup Yaz</span>
-        </button>
-      </main>
-
       <footer class="corner-label corner-label--bottom-left">by Hyle &amp; VVentos</footer>
       <time class="corner-label corner-label--bottom-right" id="liveDateTime" datetime=""></time>
     </div>
 
-    <img class="scene-sign" src="images/sign.png" alt="" aria-hidden="true" />
-
-    <button class="roaming-cat" id="roamingCat" type="button" aria-label="Sayfada gezen beyaz kedi">
-      <span class="cat-shadow" aria-hidden="true"></span>
-      <img class="cat-sprite" id="catSprite" src="images/catwalking.gif" alt="" draggable="false" />
-    </button>
+    <section class="chat-widget" id="chatWidget" aria-label="Yuva Sohbeti">
+      <button class="chat-toggle" id="chatToggle" type="button" aria-expanded="false">
+        <span>Yuva Sohbeti</span>
+        <span class="chat-unread" id="chatUnread" hidden>0</span>
+      </button>
+      <div class="chat-panel" id="chatPanel" hidden>
+        <header class="chat-head">
+          <div>
+            <h2>Yuva Sohbeti</h2>
+            <p><span aria-hidden="true">✦</span> <span id="chatOnlineCount">0</span> cicikuş burada</p>
+          </div>
+          <button class="chat-close" id="chatClose" type="button" aria-label="Sohbeti kapat">×</button>
+        </header>
+        <form class="chat-join" id="chatJoinForm">
+          <label for="chatNickname">Nickname</label>
+          <input id="chatNickname" name="nickname" type="text" maxlength="32" autocomplete="nickname" required />
+          <button type="submit">Sohbete katıl</button>
+        </form>
+        <div class="chat-room" id="chatRoom" hidden>
+          <button class="chat-load-older" id="chatLoadOlder" type="button">Daha eski mesajları yükle</button>
+          <div class="chat-messages" id="chatMessages" aria-live="polite"></div>
+          <p class="chat-empty" id="chatEmpty">Henüz sohbet başlamadı. İlk cümleyi sen bırak.</p>
+          <p class="chat-typing" id="chatTyping" aria-live="polite"></p>
+          <form class="chat-compose" id="chatComposeForm">
+            <textarea id="chatMessageInput" maxlength="300" rows="2" placeholder="Yuvaya küçük bir şey yaz…"></textarea>
+            <button type="submit">Gönder</button>
+          </form>
+          <p class="chat-warning" id="chatWarning" role="status" aria-live="polite"></p>
+        </div>
+      </div>
+    </section>
 
     <div class="toast" id="toast" role="status" aria-live="polite">Mektubun Yuvaya Ulaştı.</div>
 
@@ -304,6 +365,27 @@
       </form>
     </dialog>
 
-    <script src="script.js?v=20260520-shooting-star"></script>
+    <dialog class="chat-admin-dialog" id="chatAdminDialog" aria-labelledby="chatAdminTitle">
+      <form class="wish-note wish-note--form" id="chatAdminForm" method="dialog">
+        <button class="wish-note-close" id="closeChatAdminDialog" type="button" aria-label="Kapat">×</button>
+        <h2 id="chatAdminTitle">Yuva Sohbeti</h2>
+        <label class="wish-input-label" for="chatAdminEmail">
+          <span>Email</span>
+          <input id="chatAdminEmail" name="email" type="email" autocomplete="email" />
+        </label>
+        <label class="wish-input-label" for="chatAdminPassword">
+          <span>Şifre</span>
+          <input id="chatAdminPassword" name="password" type="password" autocomplete="current-password" />
+        </label>
+        <p class="chat-warning" id="chatAdminMessage" role="status" aria-live="polite"></p>
+        <div class="wish-actions">
+          <button class="wish-button wish-button--primary" type="submit">Giriş</button>
+          <button class="wish-button" id="dismissChatAdminDialog" type="button">Kapat</button>
+        </div>
+      </form>
+    </dialog>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="script.js?v=20260521-yuvatv-player-only"></script>
   </body>
 </html>
