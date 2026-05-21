@@ -1,6 +1,6 @@
 const imageConfig = {
   // Replace these paths with your final assets.
-  mainAnimatedImage: "images/tree-optimized.gif",
+  mainAnimatedImage: "images/tree-optimized.gif?v=20260521-scene",
   flockBird: "images/birdan-optimized.gif",
   flockBirdFallback: "images/birdan-optimized.gif",
   blueSquareImages: [
@@ -1098,10 +1098,10 @@ function connectChatSocket() {
   });
   chatSocket.on("chat:typing", (payload) => {
     if (!payload?.typing || payload.userSessionId === chatSessionId) return;
-    if (chatTyping) chatTyping.textContent = "birisi yaz?yor...";
+    if (chatTyping) chatTyping.textContent = "birisi yazıyor...";
     window.clearTimeout(chatTypingClearTimer);
     chatTypingClearTimer = window.setTimeout(() => {
-      if (chatTyping) chatTyping.textContent = "birisi yaz?yor...";
+      if (chatTyping) chatTyping.textContent = "birisi yazıyor...";
     }, 1800);
   });
   chatSocket.on("chat:moderated", (message) => {
@@ -1122,7 +1122,7 @@ function connectChatSocket() {
     chatRoom.hidden = true;
     chatJoinForm.hidden = false;
     chatWidget?.classList.remove("is-joined");
-    setChatWarning("Bu sohbet alan?na eri?imin kapal?.");
+    setChatWarning("Bu sohbet alanına erişimin kapalı.");
   });
 }
 
@@ -1161,7 +1161,7 @@ async function loadChatMessages(beforeId = "") {
     messages.forEach((message) => appendChatMessage(message, { prepend: Boolean(beforeId), quiet: true }));
     updateChatEmptyState();
   } catch (error) {
-    setChatWarning("Sohbet ?u an y?klenemedi.");
+    setChatWarning("Sohbet şu an yüklenemedi.");
   }
 }
 
@@ -1207,7 +1207,7 @@ function emitChatJoin() {
       chatJoinForm.hidden = false;
       chatWidget?.classList.remove("is-joined");
       setChatOpen(true);
-      setChatWarning(response?.error || "Sohbete kat?lamad?n.");
+      setChatWarning(response?.error || "Sohbete katılamadın.");
       updateChatComposeState();
       chatNickname?.focus();
       return;
@@ -1293,7 +1293,7 @@ function markChatMessageFailed(id) {
   if (!element) return;
   element.classList.add("is-failed");
   const pending = element.querySelector("[data-pending-label]");
-  if (pending) pending.textContent = "g?nderilemedi";
+  if (pending) pending.textContent = "gönderilemedi";
 }
 
 function settlePendingChatMessage(id, message) {
@@ -1313,7 +1313,7 @@ function settlePendingChatMessage(id, message) {
   const pending = element.querySelector("[data-pending-label]");
   const report = element.querySelector(".chat-report");
 
-  if (name) name.textContent = message.nickname || "ciciku?";
+  if (name) name.textContent = message.nickname || "cicikuş";
 
   pending?.remove();
   if (report) report.dataset.reportId = message.id;
@@ -1342,10 +1342,10 @@ function appendChatMessage(message, options = {}) {
   } else {
     item.innerHTML = `
       <header>
-        <span class="chat-message-name">${escapeHtml(message.nickname || "ciciku?")}</span>
+        <span class="chat-message-name">${escapeHtml(message.nickname || "cicikuş")}</span>
         ${message.isAdmin ? '<span class="chat-admin-badge">admin</span>' : ""}
-        ${message.pending ? '<span class="chat-message-time" data-pending-label>g?nderiliyor</span>' : ""}
-        <button class="chat-report" type="button" data-report-id="${message.id}" aria-label="Mesaj? bildir">!</button>
+        ${message.pending ? '<span class="chat-message-time" data-pending-label>gönderiliyor</span>' : ""}
+        <button class="chat-report" type="button" data-report-id="${message.id}" aria-label="Mesajı bildir">!</button>
       </header>
       <p>${escapeHtml(message.text || "")}</p>
     `;
@@ -1374,9 +1374,9 @@ async function reportChatMessage(event) {
     const response = await fetch(`/api/chat/report/${button.dataset.reportId}`, { method: "POST" });
     if (!response.ok) throw new Error("Report failed");
     button.disabled = true;
-    button.textContent = "?";
+    button.textContent = "\u2713";
   } catch (error) {
-    setChatWarning("Bildirim g?nderilemedi.");
+    setChatWarning("Bildirim gönderilemedi.");
   }
 }
 
@@ -1634,13 +1634,13 @@ async function loginChatAdmin(event) {
       }),
     });
     const data = await response.json();
-    if (!response.ok || !data.isAdmin) throw new Error(data.error || "Bu alana eri?im yetkin yok.");
+    if (!response.ok || !data.isAdmin) throw new Error(data.error || "Bu alana erişim yetkin yok.");
     chatIsAdmin = true;
     chatAdminDialog.close();
-    showToast("Admin sohbet giri?i a??ld?.");
+    showToast("Admin sohbet girişi açıldı.");
     window.setTimeout(() => window.location.reload(), 800);
   } catch (error) {
-    chatAdminMessage.textContent = error.message || "Bu alana eri?im yetkin yok.";
+    chatAdminMessage.textContent = error.message || "Bu alana erişim yetkin yok.";
   }
 }
 
@@ -1672,7 +1672,7 @@ function bindEvents() {
     event.preventDefault();
     wishFormDialog.close();
     wishForm.reset();
-    showToast("Dile?in g?ky?z?nde kald?.");
+    showToast("Dileğin gökyüzünde kaldı.");
   });
 
   openLetterModal.addEventListener("click", () => {
@@ -1725,7 +1725,7 @@ function bindEvents() {
 
   letterBody.addEventListener("input", () => {
     if (letterBody.value.trim().length >= 500) {
-      setLetterBodyMessage("Minimum 500 karakter yazmal?s?n.");
+      setLetterBodyMessage("Minimum 500 karakter yazmalısın.");
     }
   });
 
@@ -2239,7 +2239,7 @@ function initRoamingCat() {
 function updatePreview() {
   const selectedSticker = getSelectedSticker();
   syncHiddenChoices();
-  const body = letterBody.value.trim() || "Buraya i?inden ge?enleri yaz...";
+  const body = letterBody.value.trim() || "Buraya içinden geçenleri yaz...";
   const author = getBirdName();
 
   letterPreview.className = `letter-preview paper-${paperStyle.value} font-${fontStyle.value}`;
@@ -2289,20 +2289,20 @@ async function saveLetter() {
   };
 
   if (!payload.body) {
-    setLetterBodyMessage("Mektup bo? olamaz.", true);
-    showToast("Mektup Bo? Olamaz.");
+    setLetterBodyMessage("Mektup boş olamaz.", true);
+    showToast("Mektup Boş Olamaz.");
     letterBody.focus();
     return;
   }
 
   if (payload.body.length < 500) {
-    setLetterBodyMessage("Minimum 500 karakter yazmal?s?n.", true);
-    showToast("Minimum 500 Karakter yazmal?s?n.");
+    setLetterBodyMessage("Minimum 500 karakter yazmalısın.", true);
+    showToast("Minimum 500 Karakter yazmalısın.");
     letterBody.focus();
     return;
   }
 
-  setLetterBodyMessage("Minimum 500 karakter yazmal?s?n.");
+  setLetterBodyMessage("Minimum 500 karakter yazmalısın.");
 
   setLetterFormBusy(true);
 
@@ -2345,7 +2345,7 @@ async function saveLetter() {
     updatePreview();
     updateLetterCount();
     dropEnvelope(letter);
-    showToast("Mektubun Yuvaya Ula?t?.");
+    showToast("Mektubun Yuvaya Ulaştı.");
   } catch (error) {
     console.error("Letter could not be saved to the API.", error);
     showToast(getLetterSubmitErrorMessage(error));
@@ -2421,7 +2421,7 @@ function createEnvelopeElement(letter, index) {
 
   envelope.className = "envelope";
   envelope.tabIndex = 0;
-  envelope.setAttribute("aria-label", "Yuvaya b?rak?lm?? mektup zarf?");
+  envelope.setAttribute("aria-label", "Yuvaya bırakılmış mektup zarfı");
   envelope.addEventListener("click", showEnvelopeLockedMessage);
   envelope.addEventListener("keydown", (event) => {
     if (event.key === "Enter" || event.key === " ") {
@@ -2516,7 +2516,7 @@ function setLetterFormBusy(isBusy) {
   if (!sendButton) return;
 
   sendButton.disabled = isBusy;
-  sendButton.textContent = isBusy ? "G?nderiliyor..." : "G?nder";
+  sendButton.textContent = isBusy ? "Gönderiliyor..." : "Gönder";
 }
 
 function getSelectedSticker() {
@@ -2530,7 +2530,7 @@ function getSelectedRecipient() {
 }
 
 function getBirdName() {
-  if (anonymousBird.checked) return "anonim ku?";
+  if (anonymousBird.checked) return "anonim kuş";
   return birdName.value.trim();
 }
 
@@ -2554,7 +2554,7 @@ function setSelectedRadioValue(name, value) {
   if (target) target.checked = true;
 }
 
-function showToast(message = "Mektubun Yuvaya Ula?t?.") {
+function showToast(message = "Mektubun Yuvaya Ulaştı.") {
   window.clearTimeout(toastTimer);
   toast.textContent = message;
   toast.classList.add("is-visible");
@@ -2562,11 +2562,11 @@ function showToast(message = "Mektubun Yuvaya Ula?t?.") {
 }
 
 function getLetterSubmitErrorMessage(error) {
-  if (error?.status === 409) return "Bu mektup yak?n zamanda g?nderildi.";
-  if (error?.status === 429) return "?ok h?zl? g?nderim yap?ld?, biraz sonra tekrar dene.";
-  if (String(error?.message || "").includes("500 characters")) return "Minimum 500 Karakter yazmal?s?n.";
-  if (String(error?.message || "").includes("little more time")) return "G?ndermeden ?nce biraz daha bekle.";
-  return "Mektup G?nderilemedi, Tekrar Dene.";
+  if (error?.status === 409) return "Bu mektup yakın zamanda gönderildi.";
+  if (error?.status === 429) return "Çok hızlı gönderim yapıldı, biraz sonra tekrar dene.";
+  if (String(error?.message || "").includes("500 characters")) return "Minimum 500 Karakter yazmalısın.";
+  if (String(error?.message || "").includes("little more time")) return "Göndermeden önce biraz daha bekle.";
+  return "Mektup Gönderilemedi, Tekrar Dene.";
 }
 
 function setLetterBodyMessage(message, isError = false) {
