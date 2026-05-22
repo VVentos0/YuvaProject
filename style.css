@@ -159,6 +159,19 @@ body {
   animation-delay: -900ms;
 }
 
+.right-scene-projector {
+  position: absolute;
+  top: 84%;
+  left: 51%;
+  z-index: 10;
+  width: min(15vw, 210px);
+  height: auto;
+  image-rendering: auto;
+  pointer-events: none;
+  transform: translate(-50%, -50%) rotate(-5deg);
+  user-select: none;
+}
+
 .right-scene-curtain-cat {
   position: absolute;
   top: 49.5%;
@@ -237,7 +250,6 @@ body {
   filter:
     drop-shadow(0 0 5px rgba(255, 221, 92, 0.32))
     drop-shadow(0 0 14px rgba(255, 94, 38, 0.22));
-  animation: fireCoreFlicker 900ms ease-in-out infinite;
 }
 
 .fire-particle {
@@ -311,18 +323,21 @@ body {
   top: 50%;
   z-index: 56;
   display: grid;
-  width: clamp(24px, 2.8vw, 34px);
-  height: clamp(30px, 3.4vw, 42px);
+  width: clamp(30px, 3.2vw, 42px);
+  height: clamp(38px, 4vw, 52px);
   place-items: center;
-  border: 1px solid rgba(255, 240, 164, 0.16);
+  border: 1px solid rgba(255, 240, 164, 0.34);
   border-radius: 999px;
-  background: rgba(16, 10, 30, 0.28);
+  background:
+    radial-gradient(circle at 50% 42%, rgba(255, 231, 119, 0.2), transparent 62%),
+    rgba(16, 10, 30, 0.46);
   box-shadow:
-    0 0 18px rgba(255, 221, 99, 0.12),
-    inset 0 0 12px rgba(255, 244, 184, 0.04);
+    0 0 20px rgba(255, 221, 99, 0.28),
+    0 0 44px rgba(255, 180, 76, 0.13),
+    inset 0 0 14px rgba(255, 244, 184, 0.09);
   color: #fff4b8;
   cursor: pointer;
-  opacity: 0.58;
+  opacity: 0.84;
   transform: translateY(-50%);
   transition:
     opacity 180ms ease,
@@ -344,10 +359,12 @@ body {
 
 .scene-arrow:hover,
 .scene-arrow:focus-visible {
-  background: rgba(28, 15, 45, 0.44);
+  background:
+    radial-gradient(circle at 50% 42%, rgba(255, 236, 142, 0.3), transparent 64%),
+    rgba(28, 15, 45, 0.64);
   opacity: 1;
   outline: none;
-  transform: translateY(-50%) scale(1.04);
+  transform: translateY(-50%) scale(1.08);
 }
 
 .scene-arrow img {
@@ -358,8 +375,9 @@ body {
     sepia(1)
     saturate(2.2)
     hue-rotate(342deg)
-    brightness(1.35)
-    drop-shadow(0 0 8px rgba(255, 244, 184, 0.55));
+    brightness(1.65)
+    drop-shadow(0 0 8px rgba(255, 244, 184, 0.78))
+    drop-shadow(0 0 16px rgba(255, 221, 99, 0.44));
 }
 
 .scene-arrow--left img {
