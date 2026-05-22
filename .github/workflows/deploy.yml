@@ -41,6 +41,8 @@ jobs:
           VDS_SSH_KEY: ${{ secrets.VDS_SSH_KEY }}
           VDS_HOST: ${{ secrets.VDS_HOST }}
         run: |
+          test -n "$VDS_SSH_KEY" || { echo "Missing GitHub secret: VDS_SSH_KEY" >&2; exit 1; }
+          test -n "$VDS_HOST" || { echo "Missing GitHub secret: VDS_HOST" >&2; exit 1; }
           mkdir -p ~/.ssh
           chmod 700 ~/.ssh
           printf '%s\n' "$VDS_SSH_KEY" > ~/.ssh/yuva_deploy
@@ -53,8 +55,14 @@ jobs:
           VDS_USER: ${{ secrets.VDS_USER }}
           VDS_PORT: ${{ secrets.VDS_PORT }}
         run: |
-          scp -P "${VDS_PORT:-22}" -i ~/.ssh/yuva_deploy /tmp/yuva-release.tar.gz \
-            "$VDS_USER@$VDS_HOST:/tmp/yuva-release.tar.gz"
+          test -n "$VDS_USER" || { echo "Missing GitHub secret: VDS_USER" >&2; exit 1; }
+          for i in 1 2 3; do
+            scp -P "${VDS_PORT:-22}" -i ~/.ssh/yuva_deploy /tmp/yuva-release.tar.gz \
+              "$VDS_USER@$VDS_HOST:/tmp/yuva-release.tar.gz" && exit 0
+            echo "SCP upload failed, retry $i/3" >&2
+            sleep $((i * 8))
+          done
+          exit 1
 
       - name: Deploy on VDS
         env:
@@ -69,6 +77,28 @@ jobs:
           PROJECT_DIR="${VDS_PROJECT_DIR:-/home/admin/YuvaProject}"
           RELEASE_ARCHIVE="/tmp/yuva-release.tar.gz"
 
+          retry() {
+            attempts="$1"
+            shift
+            delay=8
+            n=1
+            until "$@"; do
+              if [ "$n" -ge "$attempts" ]; then
+                return 1
+              fi
+              echo "Command failed, retry $n/$attempts: $*" >&2
+              sleep "$delay"
+              n=$((n + 1))
+              delay=$((delay * 2))
+            done
+          }
+
+          safe_docker_cleanup() {
+            docker builder prune -af || true
+            docker image prune -af || true
+            docker container prune -f || true
+          }
+
           mkdir -p "$PROJECT_DIR"
           cd "$PROJECT_DIR"
 
@@ -77,19 +107,30 @@ jobs:
             exit 1
           fi
 
+          echo "Disk before cleanup:"
+          df -h "$PROJECT_DIR" /tmp || true
+          docker system df || true
+          rm -f /tmp/yuva-release.tar.gz.partial
+          safe_docker_cleanup
+
           find "$PROJECT_DIR" -mindepth 1 -maxdepth 1 ! -name ".env" -exec rm -rf {} +
           tar -xzf "$RELEASE_ARCHIVE" -C "$PROJECT_DIR"
           rm -f "$RELEASE_ARCHIVE"
 
-          docker compose up -d --build
-          docker builder prune -af --filter "until=24h" || true
+          retry 5 docker compose pull mongo
+          retry 3 docker compose up -d --build
+          safe_docker_cleanup
 
           for i in $(seq 1 45); do
             if curl -fsS --max-time 5 http://127.0.0.1:3000/api/health; then
-              break
+              docker compose ps
+              exit 0
             fi
             sleep 2
           done
 
           docker compose ps
+          docker compose logs --tail=120 app
+          docker compose logs --tail=120 mongo
+          exit 1
           REMOTE
