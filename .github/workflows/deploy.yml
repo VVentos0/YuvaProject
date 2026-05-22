@@ -93,7 +93,12 @@ jobs:
             done
           }
 
-          safe_docker_cleanup() {
+          safe_docker_pre_cleanup() {
+            docker builder prune -af || true
+            docker container prune -f || true
+          }
+
+          safe_docker_post_cleanup() {
             docker builder prune -af || true
             docker image prune -af || true
             docker container prune -f || true
@@ -111,15 +116,15 @@ jobs:
           df -h "$PROJECT_DIR" /tmp || true
           docker system df || true
           rm -f /tmp/yuva-release.tar.gz.partial
-          safe_docker_cleanup
+          safe_docker_pre_cleanup
 
           find "$PROJECT_DIR" -mindepth 1 -maxdepth 1 ! -name ".env" -exec rm -rf {} +
           tar -xzf "$RELEASE_ARCHIVE" -C "$PROJECT_DIR"
           rm -f "$RELEASE_ARCHIVE"
 
-          retry 5 docker compose pull mongo
+          retry 5 docker compose pull mongo || docker image inspect mongo:8 >/dev/null
           retry 3 docker compose up -d --build
-          safe_docker_cleanup
+          safe_docker_post_cleanup
 
           for i in $(seq 1 45); do
             if curl -fsS --max-time 5 http://127.0.0.1:3000/api/health; then
