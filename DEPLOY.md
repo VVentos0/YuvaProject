@@ -117,11 +117,11 @@ sudo certbot --nginx -d yuvarchive.com -d www.yuvarchive.com -d database.yuvarch
 
 ## 6. Admin read API
 
-Public visitors can only fetch envelope metadata. Full letters require the admin token:
+Public visitors can only fetch envelope metadata. Full letters require admin authentication on the database host:
 
 ```bash
-curl -H "x-admin-token: use-a-long-random-secret" \
-  "https://yuvarchive.com/api/admin/letters?recipient=SEDO"
+curl --user "admin:use-a-different-long-random-password" \
+  "https://database.yuvarchive.com/api/admin/letters?recipient=SEDO"
 ```
 
 You can also open:

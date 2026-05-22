@@ -402,7 +402,7 @@ ADMIN_PASSWORD
 Admin API smoke test:
 
 ```bash
-curl -H "x-admin-token: ADMIN_TOKEN" "https://yuvarchive.com/api/admin/letters?limit=1"
+curl --user "ADMIN_USERNAME:ADMIN_PASSWORD" "https://database.yuvarchive.com/api/admin/letters?limit=1"
 ```
 
 Do not weaken admin auth or expose MongoDB to the public internet.
