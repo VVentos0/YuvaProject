@@ -54,19 +54,20 @@ jobs:
           VDS_PORT: ${{ secrets.VDS_PORT }}
         run: |
           scp -P "${VDS_PORT:-22}" -i ~/.ssh/yuva_deploy /tmp/yuva-release.tar.gz \
-            "$VDS_USER@$VDS_HOST:/home/admin/yuva-release.tar.gz"
+            "$VDS_USER@$VDS_HOST:/tmp/yuva-release.tar.gz"
 
       - name: Deploy on VDS
         env:
           VDS_HOST: ${{ secrets.VDS_HOST }}
           VDS_USER: ${{ secrets.VDS_USER }}
           VDS_PORT: ${{ secrets.VDS_PORT }}
+          VDS_PROJECT_DIR: ${{ secrets.VDS_PROJECT_DIR }}
         run: |
-          ssh -p "${VDS_PORT:-22}" -i ~/.ssh/yuva_deploy "$VDS_USER@$VDS_HOST" <<'REMOTE'
+          ssh -p "${VDS_PORT:-22}" -i ~/.ssh/yuva_deploy "$VDS_USER@$VDS_HOST" "VDS_PROJECT_DIR='${VDS_PROJECT_DIR}' bash -s" <<'REMOTE'
           set -euo pipefail
 
-          PROJECT_DIR="/home/admin/YuvaProject"
-          RELEASE_ARCHIVE="/home/admin/yuva-release.tar.gz"
+          PROJECT_DIR="${VDS_PROJECT_DIR:-/home/admin/YuvaProject}"
+          RELEASE_ARCHIVE="/tmp/yuva-release.tar.gz"
 
           mkdir -p "$PROJECT_DIR"
           cd "$PROJECT_DIR"

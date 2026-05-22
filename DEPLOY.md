@@ -1,5 +1,7 @@
 # YUVA VDS deploy
 
+For a fully formatted or brand-new Ubuntu 24.04 VDS, use `FRESH_VDS_DEPLOY.md` first. This file is the shorter existing-server deploy note.
+
 Target path:
 
 ```bash
