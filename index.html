@@ -15,7 +15,7 @@
       href="https://fonts.googleapis.com/css2?family=Jersey+15&family=Pixelify+Sans:wght@500;600;700&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="style.css?v=20260521-yuvatv-player-only" />
+    <link rel="stylesheet" href="style.css?v=20260522-easter-scenes" />
   </head>
   <body>
     <div class="sliding-world" id="slidingWorld">
@@ -69,8 +69,17 @@
             </div>
           </div>
         </section>
+        <img class="right-scene-curtain-cat" src="images/cat2sleep.gif" alt="" aria-hidden="true" draggable="false" />
         <img class="right-scene-people" src="images/people.gif" alt="" aria-hidden="true" draggable="false" />
-        <img class="right-scene-fire" src="images/fire.gif" alt="" aria-hidden="true" draggable="false" />
+        <div class="right-scene-fire-wrap" aria-hidden="true">
+          <img class="right-scene-fire" src="images/fire.gif" alt="" draggable="false" />
+          <span class="fire-particle fire-particle--1"></span>
+          <span class="fire-particle fire-particle--2"></span>
+          <span class="fire-particle fire-particle--3"></span>
+          <span class="fire-particle fire-particle--4"></span>
+          <span class="fire-particle fire-particle--5"></span>
+          <span class="fire-particle fire-particle--6"></span>
+        </div>
         <div class="right-scene-placeholder" aria-hidden="true"></div>
       </section>
 
@@ -111,7 +120,7 @@
       </div>
       <div class="corner-label corner-label--right" id="letterCountLabel" aria-label="Gönderilen mektup sayısı"></div>
 
-      <footer class="corner-label corner-label--bottom-left">by Hyle &amp; VVentos</footer>
+      <footer class="corner-label corner-label--bottom-left">by <a href="https://www.instagram.com/hyle.designs/" target="_blank" rel="noopener noreferrer">Hyle</a> &amp; VVentos</footer>
       <time class="corner-label corner-label--bottom-right" id="liveDateTime" datetime=""></time>
     </div>
 
@@ -386,6 +395,6 @@
     </dialog>
 
     <script src="/socket.io/socket.io.js"></script>
-    <script src="script.js?v=20260521-yuvatv-player-only"></script>
+    <script src="script.js?v=20260522-easter-scenes"></script>
   </body>
 </html>

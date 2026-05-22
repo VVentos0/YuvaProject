@@ -62,6 +62,12 @@ const MAX_VISIBLE_ENVELOPES = 140;
 const TREE_ALPHA_THRESHOLD = 20;
 const BIRD_ALPHA_THRESHOLD = 20;
 const DEBUG_TREE_HIT_TEST = false;
+const BIRD_EASTER_EGG_VIDEO_URL = "https://p4rrot.com/clips/4d3f0172-bbdd-4932-b5cf-8b572e33001c.mp4";
+const CAT_EASTER_EGG_VIDEO_URL = "https://p4rrot.com/clips/b1a3af69-88ff-4280-8000-93e3eca0c396.mp4";
+const CAT_FIRE_VIDEO_URL = "https://p4rrot.com/clips/4597aa19-87e9-4bbb-ac13-27812835f719.mp4";
+const CAT_FIRE_TRIGGER_DELAY = 1000;
+const BIRD_EASTER_EGG_REQUIRED_CLICKS = 5;
+const BIRD_EASTER_EGG_CLICK_WINDOW = 2600;
 
 const mainImage = document.querySelector("#mainAnimatedImage");
 const mainTopImage = document.querySelector("#mainAnimatedTopImage");
@@ -182,6 +188,12 @@ let birdHitCanvas;
 let birdHitContext;
 let birdHitSourceImage;
 let birdHitReady = false;
+let birdEasterEggClicks = 0;
+let birdEasterEggLastClick = 0;
+let catEasterEggClicks = 0;
+let catEasterEggLastClick = 0;
+let catWasOverFire = false;
+let catFireTriggerTimer;
 let catFrame;
 let catState;
 let letterFormStartedAt = 0;
@@ -227,6 +239,7 @@ function init() {
   initChat();
   initYuvaTv();
   initDraggableBirds();
+  initCurtainCatHover();
   bindEvents();
   dismissWelcomeScreen();
   initRoamingCat();
@@ -1806,6 +1819,7 @@ function initDraggableBirds() {
   if (!orbit) return;
 
   initBirdHitTesting();
+  const easterEggBird = blueSquares[3];
 
   blueSquares.forEach((square) => {
     let dragOffsetX = 0;
@@ -1872,6 +1886,7 @@ function initDraggableBirds() {
 
       if (!hasDragged) {
         triggerBirdHop(square);
+        if (square === easterEggBird) handleBirdEasterEggClick();
       }
     };
 
@@ -1978,6 +1993,169 @@ function triggerBirdHop(square) {
     },
     { once: true },
   );
+}
+
+function handleBirdEasterEggClick() {
+  const now = performance.now();
+  birdEasterEggClicks = now - birdEasterEggLastClick > BIRD_EASTER_EGG_CLICK_WINDOW ? 1 : birdEasterEggClicks + 1;
+  birdEasterEggLastClick = now;
+
+  if (birdEasterEggClicks < BIRD_EASTER_EGG_REQUIRED_CLICKS) return;
+  birdEasterEggClicks = 0;
+  openBirdEasterEggVideo();
+}
+
+function handleCatEasterEggClick() {
+  const now = performance.now();
+  catEasterEggClicks = now - catEasterEggLastClick > BIRD_EASTER_EGG_CLICK_WINDOW ? 1 : catEasterEggClicks + 1;
+  catEasterEggLastClick = now;
+
+  if (catEasterEggClicks < BIRD_EASTER_EGG_REQUIRED_CLICKS) return;
+  catEasterEggClicks = 0;
+  openBirdEasterEggVideo(CAT_EASTER_EGG_VIDEO_URL);
+}
+
+function openBirdEasterEggVideo(videoUrl = BIRD_EASTER_EGG_VIDEO_URL) {
+  let overlay = document.querySelector("#birdEasterEggOverlay");
+  if (!overlay) {
+    overlay = document.createElement("div");
+    overlay.id = "birdEasterEggOverlay";
+    overlay.className = "bird-easter-egg";
+    overlay.innerHTML = `
+      <div class="bird-easter-egg-window" role="dialog" aria-modal="true" aria-label="Sakli video">
+        <button class="bird-easter-egg-close" type="button" aria-label="Kapat">\u00d7</button>
+        <video class="bird-easter-egg-video" controls playsinline preload="metadata"></video>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+
+    overlay.addEventListener("click", (event) => {
+      if (event.target === overlay || event.target.closest(".bird-easter-egg-close")) {
+        closeBirdEasterEggVideo();
+      }
+    });
+  }
+
+  const video = overlay.querySelector("video");
+  if (!video) return;
+  video.src = videoUrl;
+  video.onended = closeBirdEasterEggVideo;
+  overlay.classList.add("is-open");
+  video.currentTime = 0;
+  video.play().catch(() => {});
+}
+
+function closeBirdEasterEggVideo() {
+  const overlay = document.querySelector("#birdEasterEggOverlay");
+  const video = overlay?.querySelector("video");
+  if (video) {
+    video.onended = null;
+    video.pause();
+    video.removeAttribute("src");
+    video.load();
+  }
+  overlay?.classList.remove("is-open");
+}
+
+function checkCatFireHover() {
+  if (!roamingCat) return;
+  const fire = document.querySelector(".right-scene-fire-wrap") || document.querySelector(".right-scene-fire");
+  if (!fire) return;
+
+  const catRect = roamingCat.getBoundingClientRect();
+  const fireRect = fire.getBoundingClientRect();
+  const fireTriggerRect = getInsetRect(fireRect, 0.34, 0.22);
+  const catTriggerRect = getInsetRect(catRect, 0.28, 0.24);
+  const overlapX = Math.min(catTriggerRect.right, fireTriggerRect.right) - Math.max(catTriggerRect.left, fireTriggerRect.left);
+  const overlapY = Math.min(catTriggerRect.bottom, fireTriggerRect.bottom) - Math.max(catTriggerRect.top, fireTriggerRect.top);
+  const isOverFire = overlapX > Math.min(catTriggerRect.width, fireTriggerRect.width) * 0.28 && overlapY > Math.min(catTriggerRect.height, fireTriggerRect.height) * 0.28;
+
+  if (isOverFire && !catWasOverFire) {
+    catWasOverFire = true;
+    window.clearTimeout(catFireTriggerTimer);
+    catFireTriggerTimer = window.setTimeout(() => {
+      if (catWasOverFire) openCatFirePanel();
+    }, CAT_FIRE_TRIGGER_DELAY);
+    return;
+  }
+
+  if (!isOverFire) {
+    catWasOverFire = false;
+    window.clearTimeout(catFireTriggerTimer);
+  }
+}
+
+function getInsetRect(rect, insetXRatio, insetYRatio) {
+  const insetX = rect.width * insetXRatio;
+  const insetY = rect.height * insetYRatio;
+  return {
+    top: rect.top + insetY,
+    right: rect.right - insetX,
+    bottom: rect.bottom - insetY,
+    left: rect.left + insetX,
+    width: Math.max(0, rect.width - insetX * 2),
+    height: Math.max(0, rect.height - insetY * 2),
+  };
+}
+
+function openCatFirePanel() {
+  if (!catWasOverFire) return;
+  let overlay = document.querySelector("#catFirePanelOverlay");
+  if (!overlay) {
+    overlay = document.createElement("div");
+    overlay.id = "catFirePanelOverlay";
+    overlay.className = "cat-fire-panel";
+    overlay.innerHTML = `
+      <div class="cat-fire-panel-window" role="dialog" aria-modal="true" aria-label="Ates yayini">
+        <button class="cat-fire-panel-close" type="button" aria-label="Kapat">\u00d7</button>
+        <video class="cat-fire-panel-frame" controls playsinline preload="metadata"></video>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+
+    overlay.addEventListener("click", (event) => {
+      if (event.target === overlay || event.target.closest(".cat-fire-panel-close")) {
+        closeCatFirePanel();
+      }
+    });
+  }
+
+  const video = overlay.querySelector("video");
+  if (!video) return;
+  video.src = CAT_FIRE_VIDEO_URL;
+  video.onended = closeCatFirePanel;
+  overlay.classList.add("is-open");
+  video.currentTime = 0;
+  video.play().catch(() => {});
+}
+
+function closeCatFirePanel() {
+  const overlay = document.querySelector("#catFirePanelOverlay");
+  const video = overlay?.querySelector("video");
+  if (video) {
+    video.onended = null;
+    video.pause();
+    video.removeAttribute("src");
+    video.load();
+  }
+  overlay?.classList.remove("is-open");
+}
+
+function initCurtainCatHover() {
+  const curtainCat = document.querySelector(".right-scene-curtain-cat");
+  if (!curtainCat) return;
+
+  const sleepSrc = "images/cat2sleep.gif";
+  const playSrc = "images/cat2playing.gif";
+
+  curtainCat.addEventListener("mouseenter", () => {
+    curtainCat.src = playSrc;
+    curtainCat.classList.add("is-playing");
+  });
+  curtainCat.addEventListener("mouseleave", () => {
+    curtainCat.src = sleepSrc;
+    curtainCat.classList.remove("is-playing");
+  });
 }
 
 function initRoamingCat() {
@@ -2087,6 +2265,9 @@ function initRoamingCat() {
     swingAngle: 0,
     swingTarget: 0,
     swingVelocity: 0,
+    pointerStartX: 0,
+    pointerStartY: 0,
+    hasDragged: false,
     lastPointerX: 0,
     lastPointerTime: 0,
     walkUntil: 0,
@@ -2109,6 +2290,9 @@ function initRoamingCat() {
     catState.swingAngle = 0;
     catState.swingTarget = 0;
     catState.swingVelocity = 0;
+    catState.pointerStartX = event.clientX;
+    catState.pointerStartY = event.clientY;
+    catState.hasDragged = false;
     catState.lastPointerX = event.clientX;
     catState.lastPointerTime = performance.now();
     roamingCat.style.visibility = "visible";
@@ -2122,6 +2306,9 @@ function initRoamingCat() {
     if (!catState.dragging) return;
 
     const now = performance.now();
+    if (Math.hypot(event.clientX - catState.pointerStartX, event.clientY - catState.pointerStartY) > 8) {
+      catState.hasDragged = true;
+    }
     const elapsed = Math.max(12, now - catState.lastPointerTime);
     const velocityX = (event.clientX - catState.lastPointerX) / elapsed;
     catState.swingTarget = Math.max(-52, Math.min(52, velocityX * -34));
@@ -2132,11 +2319,13 @@ function initRoamingCat() {
     catState.y = event.clientY - catState.dragOffsetY;
     clampCat();
     setCatPosition();
+    checkCatFireHover();
   });
 
   const stopDrag = () => {
     if (!catState.dragging) return;
 
+    const wasClick = !catState.hasDragged;
     catState.dragging = false;
     stopCatSound();
     catState.swingTarget = 0;
@@ -2145,6 +2334,7 @@ function initRoamingCat() {
     catState.fallDirection = catState.side === "left" ? (Math.random() > 0.5 ? -1 : 1) : (Math.random() > 0.5 ? 1 : -1);
     setCatMode("dragging");
     setCatPosition();
+    if (wasClick) handleCatEasterEggClick();
   };
 
   roamingCat.addEventListener("pointerup", stopDrag);
@@ -2186,6 +2376,7 @@ function initRoamingCat() {
         catState.falling = false;
         startWalking(catState.fallDirection || catState.direction);
         setCatPosition();
+        checkCatFireHover();
       }
 
       catFrame = window.requestAnimationFrame(roam);
@@ -2199,6 +2390,7 @@ function initRoamingCat() {
         catState.y = laneY();
         startWalking(catState.direction);
         setCatPosition();
+        checkCatFireHover();
       }
 
       catFrame = window.requestAnimationFrame(roam);
@@ -2228,6 +2420,7 @@ function initRoamingCat() {
       }
 
       setCatPosition();
+      checkCatFireHover();
     }
 
     catFrame = window.requestAnimationFrame(roam);

@@ -203,6 +203,7 @@ app.use(
         frameSrc: ["'self'", "https://www.youtube.com", "https://www.youtube-nocookie.com"],
         frameAncestors: ["'self'"],
         imgSrc: ["'self'", "data:", "https://i.ytimg.com"],
+        mediaSrc: ["'self'", "https://p4rrot.com"],
         objectSrc: ["'none'"],
         scriptSrc: ["'self'", "https://www.youtube.com", "https://s.ytimg.com"],
         styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
