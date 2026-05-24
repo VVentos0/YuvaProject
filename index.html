@@ -15,7 +15,7 @@
       href="https://fonts.googleapis.com/css2?family=Jersey+15&family=Pixelify+Sans:wght@500;600;700&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="style.css?v=20260524-hyle-dialogue" />
+    <link rel="stylesheet" href="style.css?v=20260524-hyle-layout" />
   </head>
   <body>
     <div class="sliding-world" id="slidingWorld">
@@ -100,7 +100,10 @@
     <div class="hyle-dialogue-backdrop" id="hyleDialogueBackdrop" hidden></div>
     <section class="hyle-dialogue" id="hyleDialogue" role="dialog" aria-label="Hyle diyalogu" aria-modal="true" aria-hidden="true" hidden>
       <button class="hyle-dialogue-advance" id="hyleDialogueAdvance" type="button" aria-label="Diyaloga devam et">
-        <img class="hyle-dialogue-portrait" id="hyleDialoguePortrait" src="images/hyle1.png" alt="Hyle" draggable="false" />
+        <span class="hyle-dialogue-character">
+          <img class="hyle-dialogue-portrait" id="hyleDialoguePortrait" src="images/hyle1.png" alt="Hyle" draggable="false" />
+          <span class="hyle-dialogue-name">Hyle</span>
+        </span>
         <span class="hyle-dialogue-bubble-wrap">
           <img class="hyle-dialogue-bubble" id="hyleDialogueBubble" src="images/b1.png" alt="" draggable="false" />
           <span class="hyle-dialogue-next" aria-hidden="true"></span>

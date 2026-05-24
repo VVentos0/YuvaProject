@@ -293,9 +293,10 @@ body {
 .hyle-dialogue {
   position: fixed;
   bottom: 0;
-  left: clamp(20px, 2.2vw, 32px);
+  left: 36%;
   z-index: 90;
-  max-width: calc(100vw - clamp(20px, 2.2vw, 32px));
+  max-width: none;
+  transform: translateX(-50%);
   animation: hyleDialogueIn 220ms ease both;
 }
 
@@ -305,9 +306,8 @@ body {
 }
 
 .hyle-dialogue-advance {
-  display: flex;
-  align-items: end;
-  gap: clamp(10px, 1.1vw, 18px);
+  position: relative;
+  display: block;
   padding: 0;
   border: 0;
   background: transparent;
@@ -329,19 +329,43 @@ body {
 }
 
 .hyle-dialogue-portrait {
-  width: min(29vw, 360px, 56vh);
+  width: min(19.5vw, 242px, 37vh);
   height: auto;
+}
+
+.hyle-dialogue-character {
+  position: relative;
+  display: flex;
   flex: 0 0 auto;
+  flex-direction: column;
+  align-items: center;
+}
+
+.hyle-dialogue-name {
+  position: absolute;
+  top: clamp(-33px, -2.7vw, -24px);
+  left: 50%;
+  margin: 0;
+  color: #fff4b8;
+  font-family: "Pixelify Sans", "Courier New", monospace;
+  font-size: clamp(17px, 1.5vw, 23px);
+  font-weight: 600;
+  line-height: 1;
+  text-shadow:
+    0 2px 0 rgba(12, 11, 19, 0.82),
+    0 0 8px rgba(255, 228, 119, 0.34);
+  transform: translateX(-50%);
+  user-select: none;
 }
 
 .hyle-dialogue-bubble-wrap {
-  position: relative;
-  align-self: center;
-  margin-bottom: clamp(74px, 13vh, 156px);
+  position: absolute;
+  right: clamp(-330px, -25.5vw, -260px);
+  bottom: clamp(208px, 31vh, 276px);
 }
 
 .hyle-dialogue-bubble {
-  width: min(42vw, 540px);
+  width: min(28.1vw, 363px);
   height: auto;
 }
 
@@ -3413,11 +3437,11 @@ dialog::backdrop {
 @keyframes hyleDialogueIn {
   from {
     opacity: 0;
-    transform: translateY(10px);
+    transform: translateX(-50%);
   }
   to {
     opacity: 1;
-    transform: translateY(0);
+    transform: translateX(-50%);
   }
 }
 
@@ -3801,24 +3825,27 @@ dialog::backdrop {
   }
 
   .hyle-dialogue {
-    left: max(8px, env(safe-area-inset-left));
-    max-width: calc(100vw - max(8px, env(safe-area-inset-left)));
-  }
-
-  .hyle-dialogue-advance {
-    gap: 5px;
+    left: 34%;
+    max-width: none;
   }
 
   .hyle-dialogue-portrait {
-    width: min(36vw, 174px, 46vh);
+    width: min(30.8vw, 119px, 30.8vh);
+  }
+
+  .hyle-dialogue-name {
+    top: -22px;
+    margin: 0;
+    font-size: clamp(13px, 3.8vw, 16px);
   }
 
   .hyle-dialogue-bubble-wrap {
-    margin-bottom: clamp(42px, 8vh, 68px);
+    right: clamp(-170px, -42vw, -123px);
+    bottom: clamp(123px, 19.5vh, 156px);
   }
 
   .hyle-dialogue-bubble {
-    width: min(58vw, 290px);
+    width: min(49vw, 191px);
   }
 
   .right-scene-curtain {
