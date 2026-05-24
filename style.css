@@ -191,17 +191,170 @@ body {
   transform: translate(calc(-50% - 20px), calc(-50% - 12px));
 }
 
-.right-scene-people {
+.right-scene-people-layer {
   position: absolute;
   top: 76%;
   left: 28%;
   z-index: 12;
   width: min(50vw, 640px);
+  aspect-ratio: 16 / 9;
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+}
+
+.right-scene-people {
+  display: block;
+  width: 100%;
   height: auto;
   image-rendering: auto;
   pointer-events: none;
-  transform: translate(-50%, -50%);
   user-select: none;
+}
+
+.hyle-hotspot {
+  position: absolute;
+  top: 17%;
+  left: 63%;
+  z-index: 20;
+  width: 24%;
+  height: 57%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.hyle-hotspot:focus-visible {
+  outline: 2px dashed rgba(255, 250, 230, 0.82);
+  outline-offset: 2px;
+}
+
+.hyle-interaction-hint {
+  position: absolute;
+  top: 16%;
+  left: 75%;
+  z-index: 25;
+  display: grid;
+  width: clamp(42px, 5.2vw, 66px);
+  height: clamp(29px, 3.5vw, 43px);
+  place-items: center;
+  border: clamp(2px, 0.2vw, 3px) solid #26232a;
+  background: #fffdf7;
+  box-shadow:
+    0 0 0 2px rgba(255, 253, 247, 0.78),
+    2px 3px 0 rgba(12, 11, 19, 0.35);
+  color: #26232a;
+  image-rendering: pixelated;
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, -112%) scale(0.94);
+  transition:
+    opacity 140ms ease,
+    transform 140ms ease;
+}
+
+.hyle-interaction-hint::after {
+  position: absolute;
+  right: 12%;
+  bottom: -9px;
+  width: 10px;
+  height: 10px;
+  border-right: 3px solid #26232a;
+  border-bottom: 3px solid #26232a;
+  background: #fffdf7;
+  content: "";
+  transform: skewY(35deg);
+}
+
+.hyle-interaction-dots::after {
+  content: ".";
+  font-family: "Pixelify Sans", "Courier New", monospace;
+  font-size: clamp(22px, 2.2vw, 30px);
+  font-weight: 700;
+  line-height: 1;
+  animation: hyleHintDots 1050ms steps(1, end) infinite;
+}
+
+.hyle-hotspot:hover + .hyle-interaction-hint {
+  opacity: 1;
+  transform: translate(-50%, -120%) scale(1);
+  animation: hyleHintPop 1500ms ease-in-out infinite;
+}
+
+.hyle-dialogue-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  background: rgba(5, 7, 14, 0.66);
+  animation: hyleBackdropIn 180ms ease both;
+}
+
+.hyle-dialogue {
+  position: fixed;
+  bottom: 0;
+  left: clamp(20px, 2.2vw, 32px);
+  z-index: 90;
+  max-width: calc(100vw - clamp(20px, 2.2vw, 32px));
+  animation: hyleDialogueIn 220ms ease both;
+}
+
+.hyle-dialogue[hidden],
+.hyle-dialogue-backdrop[hidden] {
+  display: none;
+}
+
+.hyle-dialogue-advance {
+  display: flex;
+  align-items: end;
+  gap: clamp(10px, 1.1vw, 18px);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.hyle-dialogue-advance:focus-visible {
+  outline: 2px dashed rgba(255, 250, 230, 0.9);
+  outline-offset: 4px;
+}
+
+.hyle-dialogue-portrait,
+.hyle-dialogue-bubble {
+  display: block;
+  image-rendering: pixelated;
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+.hyle-dialogue-portrait {
+  width: min(29vw, 360px, 56vh);
+  height: auto;
+  flex: 0 0 auto;
+}
+
+.hyle-dialogue-bubble-wrap {
+  position: relative;
+  align-self: center;
+  margin-bottom: clamp(74px, 13vh, 156px);
+}
+
+.hyle-dialogue-bubble {
+  width: min(42vw, 540px);
+  height: auto;
+}
+
+.hyle-dialogue-next {
+  position: absolute;
+  right: clamp(14px, 2vw, 26px);
+  bottom: clamp(14px, 1.6vw, 22px);
+  width: 0;
+  height: 0;
+  border-top: clamp(7px, 0.65vw, 10px) solid #26232a;
+  border-right: clamp(6px, 0.55vw, 9px) solid transparent;
+  border-left: clamp(6px, 0.55vw, 9px) solid transparent;
+  animation: hyleNextBounce 900ms steps(2, end) infinite;
 }
 
 .right-scene-fire-wrap {
@@ -3225,6 +3378,55 @@ dialog::backdrop {
   }
 }
 
+@keyframes hyleHintDots {
+  0% {
+    content: ".";
+  }
+  33% {
+    content: "..";
+  }
+  66%,
+  100% {
+    content: "...";
+  }
+}
+
+@keyframes hyleHintPop {
+  0%,
+  100% {
+    transform: translate(-50%, -120%) scale(1);
+  }
+  50% {
+    transform: translate(-50%, calc(-120% - 2px)) scale(1);
+  }
+}
+
+@keyframes hyleBackdropIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes hyleDialogueIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes hyleNextBounce {
+  50% {
+    transform: translateY(4px);
+  }
+}
+
 @media (max-width: 900px) {
   :root {
     --stage-width: min(100vw, 720px);
@@ -3241,7 +3443,7 @@ dialog::backdrop {
     height: clamp(16px, 5vw, 22px);
   }
 
-  .right-scene-people {
+  .right-scene-people-layer {
     width: min(82vw, 480px);
   }
 
@@ -3592,10 +3794,31 @@ dialog::backdrop {
     width: clamp(46px, 13vw, 68px);
   }
 
-  .right-scene-people {
+  .right-scene-people-layer {
     top: 77%;
     left: 31%;
     width: min(74vw, 360px);
+  }
+
+  .hyle-dialogue {
+    left: max(8px, env(safe-area-inset-left));
+    max-width: calc(100vw - max(8px, env(safe-area-inset-left)));
+  }
+
+  .hyle-dialogue-advance {
+    gap: 5px;
+  }
+
+  .hyle-dialogue-portrait {
+    width: min(36vw, 174px, 46vh);
+  }
+
+  .hyle-dialogue-bubble-wrap {
+    margin-bottom: clamp(42px, 8vh, 68px);
+  }
+
+  .hyle-dialogue-bubble {
+    width: min(58vw, 290px);
   }
 
   .right-scene-curtain {

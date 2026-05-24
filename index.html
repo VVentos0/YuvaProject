@@ -71,7 +71,11 @@
           </div>
         </section>
         <img class="right-scene-curtain-cat" src="images/cat2sleep.gif" alt="" aria-hidden="true" draggable="false" />
-        <img class="right-scene-people" src="images/people.gif" alt="" aria-hidden="true" draggable="false" />
+        <div class="right-scene-people-layer">
+          <img class="right-scene-people" src="images/people.gif" alt="" aria-hidden="true" draggable="false" />
+          <button class="hyle-hotspot" id="hyleHotspot" type="button" aria-label="Hyle ile konus"></button>
+          <span class="hyle-interaction-hint" aria-hidden="true"><span class="hyle-interaction-dots"></span></span>
+        </div>
         <div class="right-scene-fire-wrap" aria-hidden="true">
           <img class="right-scene-fire" src="images/fire.gif" alt="" draggable="false" />
           <span class="fire-particle fire-particle--1"></span>
@@ -92,6 +96,17 @@
 
     <button class="scene-arrow scene-arrow--right has-fallback" id="sceneArrowRight" type="button" aria-label="Sağ sahneye geç"></button>
     <button class="scene-arrow scene-arrow--left has-fallback" id="sceneArrowLeft" type="button" aria-label="Ana sahneye dön" hidden></button>
+
+    <div class="hyle-dialogue-backdrop" id="hyleDialogueBackdrop" hidden></div>
+    <section class="hyle-dialogue" id="hyleDialogue" role="dialog" aria-label="Hyle diyalogu" aria-modal="true" aria-hidden="true" hidden>
+      <button class="hyle-dialogue-advance" id="hyleDialogueAdvance" type="button" aria-label="Diyaloga devam et">
+        <img class="hyle-dialogue-portrait" id="hyleDialoguePortrait" src="images/hyle1.png" alt="Hyle" draggable="false" />
+        <span class="hyle-dialogue-bubble-wrap">
+          <img class="hyle-dialogue-bubble" id="hyleDialogueBubble" src="images/b1.png" alt="" draggable="false" />
+          <span class="hyle-dialogue-next" aria-hidden="true"></span>
+        </span>
+      </button>
+    </section>
 
     <section class="welcome-screen" id="welcomeScreen" aria-label="YUVA giriş mesajı">
       <div class="welcome-content">
@@ -396,6 +411,6 @@
     </dialog>
 
     <script src="/socket.io/socket.io.js"></script>
-    <script src="script.js?v=20260522-easter-scenes"></script>
+    <script src="script.js?v=20260524-hyle-dialogue"></script>
   </body>
 </html>

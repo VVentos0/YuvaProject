@@ -166,6 +166,19 @@ const yuvaTvMessage = document.querySelector("#yuvaTvMessage");
 const yuvaTvPlayPause = document.querySelector("#yuvaTvPlayPause");
 const yuvaTvMute = document.querySelector("#yuvaTvMute");
 const yuvaTvNext = document.querySelector("#yuvaTvNext");
+const hyleHotspot = document.querySelector("#hyleHotspot");
+const hyleDialogueBackdrop = document.querySelector("#hyleDialogueBackdrop");
+const hyleDialogue = document.querySelector("#hyleDialogue");
+const hyleDialogueAdvance = document.querySelector("#hyleDialogueAdvance");
+const hyleDialoguePortrait = document.querySelector("#hyleDialoguePortrait");
+const hyleDialogueBubble = document.querySelector("#hyleDialogueBubble");
+
+const hyleDialogueSteps = [
+  { portrait: "images/hyle1.png", bubble: "images/b1.png" },
+  { portrait: "images/hyle2.png", bubble: "images/b2.png" },
+  { portrait: "images/hyle2.png", bubble: "images/b3.png" },
+  { portrait: "images/hyle1.png", bubble: "images/b4.png" },
+];
 
 let toastTimer;
 let atmosphereParticles = [];
@@ -219,6 +232,8 @@ let yuvaTvMuted = true;
 let yuvaTvErrorTimer;
 let yuvaTvYouTubeApiPromise;
 let yuvaTvBrokenIndexes = new Set();
+let dialogueOpen = false;
+let dialogueStep = 0;
 
 function init() {
   resetSavedLettersOnce();
@@ -830,6 +845,44 @@ function setScene(scene) {
   slidingWorld?.classList.toggle("is-right", currentScene === "right");
   if (sceneArrowRight) sceneArrowRight.hidden = currentScene !== "main";
   if (sceneArrowLeft) sceneArrowLeft.hidden = currentScene !== "right";
+}
+
+function updateDialogueAssets() {
+  if (!dialogueOpen || !hyleDialoguePortrait || !hyleDialogueBubble) return;
+  const step = hyleDialogueSteps[dialogueStep - 1];
+  if (!step) return;
+  hyleDialoguePortrait.src = step.portrait;
+  hyleDialogueBubble.src = step.bubble;
+}
+
+function openDialogue() {
+  if (!hyleDialogue || !hyleDialogueBackdrop || !hyleDialogueAdvance) return;
+  dialogueOpen = true;
+  dialogueStep = 1;
+  updateDialogueAssets();
+  hyleDialogueBackdrop.hidden = false;
+  hyleDialogue.hidden = false;
+  hyleDialogue.setAttribute("aria-hidden", "false");
+}
+
+function closeDialogue() {
+  dialogueOpen = false;
+  dialogueStep = 0;
+  if (hyleDialogueBackdrop) hyleDialogueBackdrop.hidden = true;
+  if (hyleDialogue) {
+    hyleDialogue.hidden = true;
+    hyleDialogue.setAttribute("aria-hidden", "true");
+  }
+}
+
+function advanceDialogue() {
+  if (!dialogueOpen) return;
+  dialogueStep += 1;
+  if (dialogueStep > hyleDialogueSteps.length) {
+    closeDialogue();
+    return;
+  }
+  updateDialogueAssets();
 }
 
 function getSceneViewportOffset() {
@@ -1721,6 +1774,8 @@ function bindEvents() {
     closeCdDialog.focus();
   });
   closeCdDialog.addEventListener("click", () => cdDialog.close());
+  hyleHotspot?.addEventListener("click", openDialogue);
+  hyleDialogueAdvance?.addEventListener("click", advanceDialogue);
 
   [ribbonDialog, starDialog, cdDialog, aboutYuvaDialog, envelopeLockedDialog, wishIntroDialog, wishFormDialog].forEach((dialog) => {
     if (!dialog) return;
@@ -1780,6 +1835,7 @@ function bindEvents() {
       if (envelopeLockedDialog.open) envelopeLockedDialog.close();
       if (wishIntroDialog?.open) wishIntroDialog.close();
       if (wishFormDialog?.open) wishFormDialog.close();
+      if (dialogueOpen) closeDialogue();
     }
   });
 }
