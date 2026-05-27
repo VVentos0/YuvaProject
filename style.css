@@ -174,9 +174,9 @@ body {
 
 .right-scene-curtain-cat {
   position: absolute;
-  top: 49.5%;
-  left: 56.8%;
-  z-index: 11;
+  top: 83%;
+  left: 44%;
+  z-index: 14;
   width: min(10vw, 142px);
   height: auto;
   image-rendering: auto;
@@ -292,11 +292,11 @@ body {
 
 .hyle-dialogue {
   position: fixed;
-  bottom: 0;
-  left: 36%;
+  top: 50%;
+  left: 50%;
   z-index: 90;
   max-width: none;
-  transform: translateX(-50%);
+  transform: translate(-50%, -50%);
   animation: hyleDialogueIn 220ms ease both;
 }
 
@@ -306,8 +306,9 @@ body {
 }
 
 .hyle-dialogue-advance {
-  position: relative;
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: clamp(14px, 2vw, 30px);
   padding: 0;
   border: 0;
   background: transparent;
@@ -343,12 +344,12 @@ body {
 
 .hyle-dialogue-name {
   position: absolute;
-  top: clamp(-33px, -2.7vw, -24px);
-  left: 50%;
+  top: clamp(-45px, -3.6vw, -34px);
+  left: calc(50% + 18px);
   margin: 0;
   color: #fff4b8;
   font-family: "Pixelify Sans", "Courier New", monospace;
-  font-size: clamp(17px, 1.5vw, 23px);
+  font-size: clamp(25px, 2.2vw, 34px);
   font-weight: 600;
   line-height: 1;
   text-shadow:
@@ -359,9 +360,7 @@ body {
 }
 
 .hyle-dialogue-bubble-wrap {
-  position: absolute;
-  right: clamp(-330px, -25.5vw, -260px);
-  bottom: clamp(208px, 31vh, 276px);
+  position: relative;
 }
 
 .hyle-dialogue-bubble {
@@ -3437,11 +3436,11 @@ dialog::backdrop {
 @keyframes hyleDialogueIn {
   from {
     opacity: 0;
-    transform: translateX(-50%);
+    transform: translate(-50%, -50%);
   }
   to {
     opacity: 1;
-    transform: translateX(-50%);
+    transform: translate(-50%, -50%);
   }
 }
 
@@ -3825,8 +3824,13 @@ dialog::backdrop {
   }
 
   .hyle-dialogue {
-    left: 34%;
+    top: 50%;
+    left: 50%;
     max-width: none;
+  }
+
+  .hyle-dialogue-advance {
+    gap: clamp(7px, 2vw, 10px);
   }
 
   .hyle-dialogue-portrait {
@@ -3834,14 +3838,14 @@ dialog::backdrop {
   }
 
   .hyle-dialogue-name {
-    top: -22px;
+    top: -31px;
+    left: calc(50% + 10px);
     margin: 0;
-    font-size: clamp(13px, 3.8vw, 16px);
+    font-size: clamp(19px, 5.3vw, 23px);
   }
 
   .hyle-dialogue-bubble-wrap {
-    right: clamp(-170px, -42vw, -123px);
-    bottom: clamp(123px, 19.5vh, 156px);
+    position: relative;
   }
 
   .hyle-dialogue-bubble {
@@ -3855,8 +3859,8 @@ dialog::backdrop {
   }
 
   .right-scene-curtain-cat {
-    top: 50%;
-    left: 57%;
+    top: 83%;
+    left: 44%;
     width: min(13vw, 78px);
     transform: translate(calc(-50% - 12px), calc(-50% + 3px));
   }
