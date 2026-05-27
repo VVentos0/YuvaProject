@@ -174,10 +174,10 @@ const hyleDialoguePortrait = document.querySelector("#hyleDialoguePortrait");
 const hyleDialogueBubble = document.querySelector("#hyleDialogueBubble");
 
 const hyleDialogueSteps = [
-  { portrait: "images/hyle1.png", bubble: "images/b1.png" },
-  { portrait: "images/hyle2.png", bubble: "images/b2.png" },
-  { portrait: "images/hyle2.png", bubble: "images/b3.png" },
-  { portrait: "images/hyle1.png", bubble: "images/b4.png" },
+  { portrait: "images/hyle1.png?v=20260527-portrait-refresh", bubble: "images/b1.png" },
+  { portrait: "images/hyle2.png?v=20260527-portrait-refresh", bubble: "images/b2.png" },
+  { portrait: "images/hyle2.png?v=20260527-portrait-refresh", bubble: "images/b3.png" },
+  { portrait: "images/hyle1.png?v=20260527-portrait-refresh", bubble: "images/b4.png" },
 ];
 
 let toastTimer;
