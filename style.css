@@ -1220,6 +1220,17 @@ button {
   transform: translateX(-50%);
 }
 
+/* Ultrawide (wider than 16:9): the cover box is taller than the viewport, so
+   its bottom is cropped and the lowest letter row falls off-screen. Lift and
+   compress the band so every envelope stays on the visible grass. Gated to
+   large widths so 16:9/16:10/4K desktops and landscape phones are untouched. */
+@media (min-aspect-ratio: 2 / 1) and (min-width: 1100px) {
+  .envelope-garden {
+    top: 67%;
+    height: calc(var(--stage-width) * 0.104);
+  }
+}
+
 .envelope {
   position: absolute;
   width: var(--envelope-size);
