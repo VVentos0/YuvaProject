@@ -11,12 +11,26 @@
   --card-ink: #f8f1e7;
   --shadow: 0 24px 70px rgba(45, 41, 38, 0.14);
   --radius: 8px;
-  --stage-width: min(100vw, calc(100dvh * 16 / 9), 1600px);
-  --stage-height: calc(var(--stage-width) * 0.5625);
-  --main-w: clamp(420px, calc(var(--stage-width) * 0.7), 1040px);
+  /* Cover stage: a 16:9 box scaled UNIFORMLY to fully cover the viewport in both
+     axes (the larger of fit-width / fit-height). The whole composition — tree,
+     sign, birds, envelopes — AND the background panorama scale off this one box,
+     so they always stay locked together (tree grounded on the painted horizon)
+     and the tree stays as dominant on ultra-wide / 4:3 as it is at 16:9. Excess
+     is cropped by the scene's overflow:hidden (sky top/bottom on wide screens,
+     side scenery on tall screens). Exactly equals the viewport at 16:9, so the
+     approved 1920×1080 reference is preserved pixel-for-pixel. */
+  --stage-width: max(100vw, calc(100svh * 16 / 9));
+  --stage-height: calc(var(--stage-width) * 9 / 16);
+  /* Element sizes are pure fractions of the box (no caps) so the whole
+     composition scales as one unit. Fractions reproduce the approved 1920×1080
+     reference (tree 1040 / bird 168 / envelope 60 px at 1080px height). */
+  --main-w: calc(var(--stage-width) * 0.542);
   --main-h: calc(var(--main-w) * 0.735);
-  --blue-size: clamp(86px, calc(var(--stage-width) * 0.105), 176px);
-  --envelope-size: clamp(28px, calc(var(--stage-width) * 0.039), 60px);
+  --blue-size: calc(var(--stage-width) * 0.0875);
+  --envelope-size: calc(var(--stage-width) * 0.03125);
+  /* Background shares the cover stage exactly, so panorama horizon = tree base. */
+  --bg-cover-w: var(--stage-width);
+  --bg-cover-h: var(--stage-height);
   --corner-pad: clamp(16px, 2.1vw, 34px);
   --letter-anchor-x: 0.59;
   --letter-anchor-y: 0.69;
@@ -71,9 +85,7 @@ body {
   width: 200vw;
   height: 100vh;
   height: 100svh;
-  background:
-    url("images/bgfull.jpg") center center / 100% 100% no-repeat,
-    var(--bg);
+  background: var(--bg);
   overflow: hidden;
   transition: transform 1500ms cubic-bezier(0.65, 0, 0.35, 1);
   will-change: transform;
@@ -100,6 +112,35 @@ body {
 
 .world-scene--right {
   background: transparent;
+}
+
+/* Per-scene background layer: the FULL 32:9 panorama scaled off --bg-cover-h
+   (see :root) so it always covers the viewport with no gaps and no stretching
+   (uniform scale in both axes). At 16:9/4:3/4K/portrait this equals the
+   foreground stage exactly (pixel-matched horizon); only ultra-wide screens
+   scale it up further to stay gap-free, at the cost of a small extra vertical
+   crop. Positioned with `left` directly (not a transform %, which is relative
+   to the ELEMENT's own — much larger — width and would need a fragile
+   quarter-panorama calc) so each half's centre lands in the viewport centre. */
+.world-scene--main::before,
+.world-scene--right::before {
+  position: absolute;
+  top: 50%;
+  z-index: 0;
+  height: var(--bg-cover-h);
+  width: calc(var(--bg-cover-h) * 32 / 9);
+  background: url("images/bgfull.jpg") no-repeat center / 100% 100%;
+  content: "";
+  pointer-events: none;
+  transform: translateY(-50%);
+}
+
+.world-scene--main::before {
+  left: calc(50% - var(--bg-cover-w) / 2);
+}
+
+.world-scene--right::before {
+  left: calc(50% - var(--bg-cover-w) * 1.5);
 }
 
 .bird-flock {
@@ -137,12 +178,26 @@ body {
   animation-name: flockBirdBobLeft;
 }
 
+/* Right scene composition wrapper: same cover 16:9 box as the background layer,
+   centered in the scene, so every element scales/aligns with the panorama on any
+   aspect ratio (children keep their % positions, now resolved against this box). */
+.scene-stage--right {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  z-index: 8;
+  width: var(--stage-width);
+  height: var(--stage-height);
+  isolation: isolate;
+  transform: translate(-50%, -50%);
+}
+
 .right-scene-curtain {
   position: absolute;
   top: 54%;
   left: 78%;
   z-index: 9;
-  width: min(44vw, 620px);
+  width: calc(var(--stage-width) * 0.323);
   height: auto;
   pointer-events: none;
   transform: translate(-50%, -50%);
@@ -164,7 +219,7 @@ body {
   top: 76%;
   left: 70%;
   z-index: 12;
-  width: min(13vw, 190px);
+  width: calc(var(--stage-width) * 0.099);
   height: auto;
   image-rendering: auto;
   pointer-events: none;
@@ -177,7 +232,7 @@ body {
   top: 83%;
   left: 44%;
   z-index: 14;
-  width: min(10vw, 142px);
+  width: calc(var(--stage-width) * 0.074);
   height: auto;
   image-rendering: auto;
   pointer-events: auto;
@@ -187,7 +242,7 @@ body {
 }
 
 .right-scene-curtain-cat.is-playing {
-  width: min(5.7vw, 80px);
+  width: calc(var(--stage-width) * 0.0417);
   transform: translate(calc(-50% - 20px), calc(-50% - 12px));
 }
 
@@ -196,7 +251,7 @@ body {
   top: 76%;
   left: 28%;
   z-index: 12;
-  width: min(50vw, 640px);
+  width: calc(var(--stage-width) * 0.333);
   aspect-ratio: 16 / 9;
   pointer-events: none;
   transform: translate(-50%, -50%);
@@ -385,7 +440,7 @@ body {
   top: 83%;
   left: 31%;
   z-index: 13;
-  width: min(11vw, 145px);
+  width: calc(var(--stage-width) * 0.0755);
   pointer-events: none;
   transform: translate(-50%, -74%);
   user-select: none;
@@ -1085,14 +1140,17 @@ button {
 }
 
 .yuva-stage {
-  position: relative;
+  position: absolute;
+  top: 50%;
+  left: 50%;
   z-index: 10;
-  width: min(100%, var(--stage-width));
+  width: var(--stage-width);
   height: var(--stage-height);
   min-height: 0;
-  aspect-ratio: 16 / 9;
   isolation: isolate;
-  transform: translateY(clamp(-56px, -5vh, -18px));
+  /* Centred over the panorama; a small proportional upward nudge (scales with the
+     stage) matches the approved 16:9 framing without breaking horizon alignment. */
+  transform: translate(-50%, calc(-50% - var(--stage-height) * 0.05));
 }
 
 .main-image-area,
@@ -1156,8 +1214,8 @@ button {
   top: 72%;
   left: 46%;
   z-index: 4;
-  width: clamp(360px, calc(var(--stage-width) * 0.66), 980px);
-  height: clamp(130px, calc(var(--stage-width) * 0.15), 240px);
+  width: calc(var(--stage-width) * 0.5104);
+  height: calc(var(--stage-width) * 0.125);
   pointer-events: auto;
   transform: translateX(-50%);
 }
@@ -1266,10 +1324,15 @@ button {
 
 .scene-sign {
   position: absolute;
-  top: 72%;
-  left: clamp(18px, 4vw, 72px);
+  top: 78%;
+  /* Keep the sign at its designed spot on wide screens, but when the cover stage
+     is wider than the viewport (aspect < 16:9, e.g. 4:3) its left edge is off
+     screen — pull the sign in so it never clips past the viewport's left corner.
+     (var(--stage-width) - 100vw)/2 is how far the stage's left edge sits off the
+     viewport's left edge. */
+  left: max(calc(var(--stage-width) * 0.037), calc((var(--stage-width) - 100vw) / 2 + 12px));
   z-index: 17;
-  width: clamp(74px, 8vw, 150px);
+  width: calc(var(--stage-width) * 0.078);
   height: auto;
   image-rendering: pixelated;
   filter:
@@ -1334,8 +1397,8 @@ button {
   top: 50%;
   left: 37.2%;
   z-index: 7;
-  width: clamp(82px, 6.8vw, 112px);
-  height: clamp(62px, 5.2vw, 86px);
+  width: calc(var(--stage-width) * 0.0583);
+  height: calc(var(--stage-width) * 0.0448);
   border: 0;
   background: transparent;
   cursor: pointer;
@@ -1359,16 +1422,16 @@ button {
 .ornament-hotspot--star {
   top: 55%;
   left: 58.2%;
-  width: clamp(42px, 4.3vw, 70px);
-  height: clamp(42px, 4.3vw, 70px);
+  width: calc(var(--stage-width) * 0.0365);
+  height: calc(var(--stage-width) * 0.0365);
   transform: translate(-50%, -50%);
 }
 
 .ornament-hotspot--cd {
   top: 56.3%;
   left: 62.2%;
-  width: clamp(44px, 4.5vw, 72px);
-  height: clamp(44px, 4.5vw, 72px);
+  width: calc(var(--stage-width) * 0.0375);
+  height: calc(var(--stage-width) * 0.0375);
   transform: translate(-50%, -50%);
 }
 
@@ -1598,7 +1661,7 @@ button {
   top: calc(50% + (var(--main-h) * (var(--letter-anchor-y) - 0.5)));
   left: 50%;
   z-index: 6;
-  width: clamp(120px, 8vw, 150px);
+  width: calc(var(--stage-width) * 0.078125);
   height: auto;
   aspect-ratio: 652 / 470;
   border-radius: 0;
@@ -1646,74 +1709,18 @@ body.has-entered .write-button {
   transform: translate(-50%, calc(-50% - 4px)) rotate(-0.7deg);
 }
 
+/* Large-monitor UI padding: the stage composition itself now scales purely
+   with viewport height (see :root), so no stage/element overrides are needed
+   here — only the fixed-position corner UI gets extra breathing room. */
 @media (min-width: 2200px) and (min-height: 1200px) {
   :root {
-    --stage-width: min(100vw, calc(100dvh * 16 / 9), 2300px);
-    --stage-height: calc(var(--stage-width) * 0.5625);
-    --main-w: clamp(1040px, calc(var(--stage-width) * 0.62), 1420px);
-    --main-h: calc(var(--main-w) * 0.735);
-    --blue-size: clamp(176px, calc(var(--stage-width) * 0.095), 220px);
-    --envelope-size: clamp(60px, calc(var(--stage-width) * 0.034), 78px);
     --corner-pad: clamp(34px, 1.7vw, 54px);
-  }
-
-  .yuva-stage {
-    transform: translateY(clamp(-56px, -2.5vh, -24px));
-  }
-
-  .envelope-garden {
-    width: clamp(980px, calc(var(--stage-width) * 0.66), 1420px);
-    height: clamp(240px, calc(var(--stage-width) * 0.15), 330px);
-  }
-
-  .write-button {
-    width: clamp(150px, calc(var(--stage-width) * 0.08), 190px);
-  }
-
-  .scene-sign {
-    width: clamp(150px, 6vw, 210px);
-  }
-
-  .ribbon-hotspot {
-    width: clamp(112px, calc(var(--stage-width) * 0.07), 150px);
-    height: clamp(86px, calc(var(--stage-width) * 0.052), 118px);
-  }
-
-  .ornament-hotspot--star {
-    width: clamp(70px, calc(var(--stage-width) * 0.043), 94px);
-    height: clamp(70px, calc(var(--stage-width) * 0.043), 94px);
-  }
-
-  .ornament-hotspot--cd {
-    width: clamp(72px, calc(var(--stage-width) * 0.045), 98px);
-    height: clamp(72px, calc(var(--stage-width) * 0.045), 98px);
   }
 }
 
 @media (min-width: 3400px) and (min-height: 1900px) {
   :root {
-    --stage-width: min(100vw, calc(100dvh * 16 / 9), 2800px);
-    --main-w: clamp(1420px, calc(var(--stage-width) * 0.58), 1680px);
-    --blue-size: clamp(220px, calc(var(--stage-width) * 0.092), 270px);
-    --envelope-size: clamp(78px, calc(var(--stage-width) * 0.033), 94px);
     --corner-pad: clamp(46px, 1.5vw, 68px);
-  }
-
-  .envelope-garden {
-    width: clamp(1420px, calc(var(--stage-width) * 0.65), 1780px);
-    height: clamp(330px, calc(var(--stage-width) * 0.145), 410px);
-  }
-
-  .write-button {
-    width: clamp(190px, calc(var(--stage-width) * 0.075), 240px);
-  }
-
-  .yuva-stage {
-    transform: translateY(clamp(-24px, -1vh, 0px));
-  }
-
-  .scene-sign {
-    width: clamp(210px, 5.8vw, 260px);
   }
 }
 
@@ -2026,7 +2033,7 @@ body.has-entered .write-button {
   top: 46%;
   left: 78%;
   z-index: 10;
-  width: min(30vw, 455px);
+  width: calc(var(--stage-width) * 0.237);
   color: #fff4b8;
   font-family: "Jersey 15", "Pixelify Sans", "Courier New", monospace;
   transform: translate(-50%, -50%);
@@ -3530,6 +3537,10 @@ dialog::backdrop {
   }
 
   .yuva-stage {
+    /* Reset the desktop cover-box positioning: mobile uses a normal-flow /
+       viewport-sized stage, not the absolutely-centered cover box. */
+    position: relative;
+    inset: auto;
     display: flex;
     width: min(100%, var(--stage-width));
     height: auto;
@@ -3540,6 +3551,16 @@ dialog::backdrop {
     gap: clamp(12px, 3.5vw, 22px);
     padding: 16px 0 0;
     transform: translateY(-10px);
+  }
+
+  /* Right scene: on mobile fill the viewport (not the desktop cover box) so its
+     children position against the screen as the mobile overrides below expect. */
+  .scene-stage--right {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    transform: none;
   }
 
   .main-image-area,
@@ -3607,15 +3628,27 @@ dialog::backdrop {
     overflow-y: auto;
   }
 
+  /* Mobile: stack editor + preview as a natural-height flex column so neither
+     collapses; the modal itself scrolls (overflow-y:auto) as one unit. */
   .modal-grid {
+    display: flex;
+    flex: 0 0 auto;
+    flex-direction: column;
     grid-template-columns: 1fr;
     overflow: visible;
   }
 
   .letter-editor {
-    grid-template-rows: auto minmax(220px, 320px) auto auto auto;
+    display: flex;
+    flex-direction: column;
+    grid-template-rows: none;
     overflow: visible;
+    min-height: 0;
     padding-right: 0;
+  }
+
+  .letter-editor textarea {
+    min-height: 200px;
   }
 
   .letter-preview-wrap {
@@ -3787,6 +3820,10 @@ dialog::backdrop {
   }
 
   .yuva-stage {
+    /* Reset the desktop cover-box offset so the stage fills the viewport from
+       the top-left (children are absolutely positioned against it below). */
+    top: 0;
+    left: 0;
     width: 100vw;
     height: 100svh;
     display: grid;
@@ -4127,6 +4164,302 @@ dialog::backdrop {
   .ghost-button,
   .send-button {
     width: 100%;
+  }
+}
+
+/* Portrait screens (phones AND portrait tablets): unify under ONE grounded,
+   immersive composition regardless of width, replacing the ≤900/≤768/≤620
+   width-based patchwork above (which only reaches phone widths and left wide
+   portrait tablets — e.g. 1024px — falling through to the desktop height-driven
+   system, producing an oversized, ungrounded tree). Because media queries don't
+   increase specificity, and this block is placed AFTER the ≤900/≤768/≤620 blocks
+   in the file, its declarations win the cascade for any property it sets — but
+   per CSS's per-property cascade, every property those blocks touch must be
+   re-declared here explicitly (a partial override lets a stale value leak
+   through, as top/left did in the very first pass at this).
+   `--port-scale` sizes the composition off the SMALLER of viewport width or a
+   height fraction, so tall narrow phones use the full width while wide portrait
+   tablets get a comfortably inset composition instead of an edge-to-edge one. */
+@media (orientation: portrait) {
+  :root {
+    /* The ≤900 block sets --stage-height:auto for its own flex-stack (and ≤768
+       restores it, but only up to 768px — leaving the 769–900px portrait band,
+       e.g. an 820px-wide tablet, with an invalid auto height that collapses the
+       background layer to 0×0). Restore the height-driven formula unconditionally
+       so the background sizing (which still keys off --stage-width/height) stays
+       correct at every portrait width. */
+    --stage-height: 100svh;
+    --stage-width: calc(var(--stage-height) * 16 / 9);
+    --port-scale: min(100vw, 56svh);
+    /* Portrait tree dimensions, reused by the write-button anchor below so the
+       button lands ON the trunk (same 0.69 anchor as desktop) rather than under
+       the tree. */
+    --port-tree-w: calc(var(--port-scale) * 0.86);
+    --port-tree-h: calc(var(--port-tree-w) * 0.735);
+    /* Lowered so the tree's roots sit firmly in the painted grass (base ≈ 80%). */
+    --port-tree-cy: 65.5%;
+  }
+
+  .yuva-stage {
+    position: absolute;
+    inset: 0;
+    top: 0;
+    left: 0;
+    right: auto;
+    bottom: auto;
+    width: 100%;
+    height: 100%;
+    display: block;
+    padding: 0;
+    transform: none;
+  }
+
+  /* --stage-width is height-driven (16:9 from full svh) and far wider than a
+     portrait viewport; the right scene's own box must match the viewport like
+     .yuva-stage above, or its children's % positions resolve against the wrong,
+     off-screen-wide box. */
+  .scene-stage--right {
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    transform: none;
+  }
+
+  .main-image-area,
+  .envelope-garden,
+  .write-button {
+    position: absolute;
+    transform: translate(-50%, -50%);
+  }
+
+  .main-image-area {
+    top: var(--port-tree-cy);
+    left: 50%;
+    width: var(--port-tree-w);
+    height: var(--port-tree-h);
+    aspect-ratio: auto;
+    order: initial;
+  }
+
+  .envelope-garden {
+    top: calc(var(--port-tree-cy) + var(--port-tree-h) * 0.36);
+    left: 50%;
+    width: calc(var(--port-scale) * 0.94);
+    height: calc(var(--port-scale) * 0.15);
+    margin: 0;
+    order: initial;
+  }
+
+  /* Button on the trunk: tree centre + 0.189·treeHeight (the 0.69 desktop
+     anchor measured from the tree's own centre). */
+  .write-button {
+    top: calc(var(--port-tree-cy) + var(--port-tree-h) * 0.189);
+    left: 50%;
+    width: calc(var(--port-scale) * 0.19);
+    order: initial;
+  }
+
+  /* Birds live in a band spanning the sky above and around the tree canopy.
+     (inset:0 + top/left:auto collapsed the orbit to 0×0, hiding every bird in
+     the bottom-right corner — give it a real box so the nth-child % positions
+     resolve around the tree.) */
+  .memory-orbit {
+    position: absolute;
+    top: calc(var(--port-tree-cy) - 24%);
+    bottom: auto;
+    left: 2%;
+    right: 2%;
+    display: block;
+    width: auto;
+    height: 58%;
+    grid-template-columns: none;
+    gap: 0;
+    order: initial;
+    pointer-events: none;
+    transform: none;
+  }
+
+  .blue-square {
+    position: absolute;
+    width: calc(var(--port-scale) * 0.155);
+    height: calc(var(--port-scale) * 0.155);
+    aspect-ratio: auto;
+  }
+
+  .scene-sign {
+    top: 82%;
+    left: max(10px, env(safe-area-inset-left));
+    width: calc(var(--port-scale) * 0.145);
+  }
+
+  .roaming-cat {
+    width: calc(var(--port-scale) * 0.13);
+  }
+
+  /* Counter label ("x kişi yuvaya mektup bıraktı") was colliding with the
+     centered corner-home menu row below it; push it under the menu instead. */
+  .corner-label--right {
+    top: calc(120px + env(safe-area-inset-top));
+    right: 12px;
+    max-width: min(50vw, 220px);
+  }
+
+  /* Right scene (outdoor cinema), portrait: centre the whole composition — screen
+     up top, audience + fire grounded directly below it — instead of the desktop
+     left/right spread that squashed pieces off to the sides / past the viewport.
+     .right-scene-curtain (frame) and .yuva-tv (picture) share the same centre and
+     keep the desktop's ~8% vertical offset so the video stays inside the frame. */
+  /* Right scene, portrait: audience on the LEFT, the projection screen + projector
+     on the RIGHT and dropped LOW so the screen's legs plant firmly in the grass
+     (not floating). Mirrors the desktop left/right split, just tightened for the
+     narrow viewport. .yuva-tv (picture) shares the screen's centre & sits ~8%
+     higher so it stays inside the frame. */
+  .right-scene-curtain {
+    top: 67%;
+    left: 70%;
+    width: min(58vw, 224px);
+  }
+
+  .yuva-tv {
+    top: 63.5%;
+    left: 70%;
+    width: min(42vw, 162px);
+  }
+
+  .right-scene-projector {
+    top: 85%;
+    left: 48%;
+    width: min(16vw, 78px);
+  }
+
+  .right-scene-people-layer {
+    top: 78%;
+    left: 27%;
+    width: min(50vw, 196px);
+  }
+
+  .right-scene-fire-wrap {
+    top: 86%;
+    left: 18%;
+    width: min(11vw, 52px);
+  }
+
+  .right-scene-curtain-cat {
+    top: 84%;
+    left: 41%;
+    width: min(9vw, 46px);
+  }
+}
+
+/* Any landscape screen ≤900px wide: the ≤900/≤768 blocks above apply their
+   narrow-portrait-tuned flex-stack / absolute mobile layout, but a landscape
+   phone or small landscape tablet should use the SAME height-driven grounded
+   stage as desktop instead. Gated by the same max-width as the blocks it
+   overrides (not by height) so it reaches every landscape aspect in that width
+   band, not just very short ones — normal desktop widths (>900px) never match
+   this query and keep their own values (roaming-cat size, page-shell padding). */
+@media (orientation: landscape) and (max-width: 900px) {
+  /* The ≤900/≤768 blocks above also redefine these custom properties for their
+     own mobile layouts (width-based caps); restore the height-driven formula so
+     the grounded composition below is not built on stale mobile-tuned values. */
+  :root {
+    /* Restore the base COVER formula (the ≤900/≤768 blocks clobbered it with
+       width-based mobile values). max(100vw, …) guarantees the box — and the
+       background keyed off it — is never narrower than the viewport, so a
+       landscape phone gets no cream gap on the sides. */
+    --stage-width: max(100vw, calc(100svh * 16 / 9));
+    --stage-height: calc(var(--stage-width) * 9 / 16);
+    --main-w: calc(var(--stage-width) * 0.542);
+    --main-h: calc(var(--main-w) * 0.735);
+    --blue-size: calc(var(--stage-width) * 0.0875);
+    --envelope-size: calc(var(--stage-width) * 0.03125);
+  }
+
+  .yuva-stage {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    right: auto;
+    bottom: auto;
+    display: block;
+    width: var(--stage-width);
+    height: var(--stage-height);
+    min-height: 0;
+    padding: 0;
+    transform: translate(-50%, calc(-50% - var(--stage-height) * 0.05));
+  }
+
+  /* The ≤900 block above re-points these to relative/flow positioning (for its
+     vertical stack); CSS cascades per-property, so every property it touches
+     must be explicitly restored here to the grounded desktop values — omitting
+     one leaves a stale `top:auto`/`order:N` in place. */
+  .main-image-area {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: var(--main-w);
+    height: var(--main-h);
+    aspect-ratio: auto;
+    order: initial;
+    transform: translate(-50%, -50%);
+  }
+
+  .envelope-garden {
+    position: absolute;
+    top: 72%;
+    left: 46%;
+    width: calc(var(--stage-width) * 0.5104);
+    height: calc(var(--stage-width) * 0.125);
+    margin-top: 0;
+    order: initial;
+    transform: translateX(-50%);
+  }
+
+  .write-button {
+    position: absolute;
+    top: calc(50% + (var(--main-h) * (var(--letter-anchor-y) - 0.5)));
+    left: 50%;
+    width: calc(var(--stage-width) * 0.078125);
+    order: initial;
+    transform: translate(calc(-50% - 6px), -2px);
+  }
+
+  .memory-orbit {
+    position: absolute;
+    inset: 0;
+    display: block;
+    width: auto;
+    height: auto;
+    grid-template-columns: none;
+    gap: 0;
+    order: initial;
+    pointer-events: none;
+  }
+
+  .blue-square {
+    position: absolute;
+    width: var(--blue-size);
+    height: var(--blue-size);
+    aspect-ratio: auto;
+  }
+
+  .scene-sign {
+    top: 78%;
+    left: max(calc(var(--stage-width) * 0.037), calc((var(--stage-width) - 100vw) / 2 + 12px));
+    width: calc(var(--stage-width) * 0.078);
+  }
+
+  .roaming-cat {
+    width: clamp(42px, 11svh, 62px);
+  }
+
+  .page-shell {
+    padding:
+      calc(6px + env(safe-area-inset-top))
+      calc(6px + env(safe-area-inset-right))
+      calc(6px + env(safe-area-inset-bottom))
+      calc(6px + env(safe-area-inset-left));
   }
 }
 
