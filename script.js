@@ -21,7 +21,7 @@ const imageConfig = {
 
 const soundConfig = {
   background: "sounds/bg.mp3",
-  tree: "sounds/tree.mp3",
+  tree: "sounds/tree.mp3?v=20260708-trim3s", // /sounds/ is cached immutable for 30d; version-bust so the trim ships now
   cat: "sounds/cat.mp3",
   cd: "sounds/cd.mp3",
   star: "sounds/star.mp3",
