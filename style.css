@@ -1238,15 +1238,15 @@ button {
 
 .envelope-garden {
   position: absolute;
-  /* Top is kept well below the painted horizon (~52% of the stage) so no letter
-     can ever land in the sky; the box reaches down to the tree base so the pile
-     sits on the grass. Width is capped to the viewport on cover aspects (4:3)
-     so the fan never spills onto the corner props. */
-  top: 71%;
+  /* Pinned right at the tree's roots — the far background hillside silhouette
+     reads as "sky" too, so the pile must sit deep in the near foreground grass,
+     hugging the trunk base, not partway up the scene. Width is capped to the
+     viewport on cover aspects (4:3) so the fan never spills onto corner props. */
+  top: 83%;
   left: 50%;
   z-index: 4;
   width: min(calc(var(--stage-width) * 0.82), 90vw);
-  height: calc(var(--stage-width) * 0.115);
+  height: calc(var(--stage-width) * 0.07);
   pointer-events: auto;
   transform: translateX(-50%);
 }
@@ -1257,8 +1257,8 @@ button {
    large widths so 16:9/16:10/4K desktops and landscape phones are untouched. */
 @media (min-aspect-ratio: 2 / 1) and (min-width: 1100px) {
   .envelope-garden {
-    top: 68%;
-    height: calc(var(--stage-width) * 0.098);
+    top: 79%;
+    height: calc(var(--stage-width) * 0.058);
   }
 }
 
@@ -4371,10 +4371,10 @@ dialog::backdrop {
   }
 
   .envelope-garden {
-    top: calc(var(--port-tree-cy) + var(--port-tree-h) * 0.28);
+    top: calc(var(--port-tree-cy) + var(--port-tree-h) * 0.46);
     left: 50%;
     width: calc(var(--port-scale) * 0.96);
-    height: calc(var(--port-scale) * 0.17);
+    height: calc(var(--port-scale) * 0.105);
     margin: 0;
     order: initial;
   }
@@ -4535,10 +4535,10 @@ dialog::backdrop {
 
   .envelope-garden {
     position: absolute;
-    top: 69%;
+    top: 80%;
     left: 50%;
     width: min(calc(var(--stage-width) * 0.82), 92vw);
-    height: calc(var(--stage-width) * 0.088);
+    height: calc(var(--stage-width) * 0.052);
     margin-top: 0;
     order: initial;
     transform: translateX(-50%);

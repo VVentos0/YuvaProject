@@ -2259,14 +2259,14 @@ function initRoamingCat() {
   const pointerWorldX = (event) => event.clientX + getSceneViewportOffset();
   const laneY = () => {
     const rect = catSize();
-    // Anchor the cat to the tree base so it walks just in front of the grounded
-    // letters on every aspect ratio (the letters track the base too). The base
-    // is stage-anchored, unlike a flat viewport ratio, so they never diverge.
+    // Anchor the cat to the tree base on every aspect ratio. The letter pile
+    // now hugs this same base line, so the cat walks straight across the top
+    // of the pile — by design (it renders above the envelopes), not around it.
     const treeArea = document.querySelector("#treeHitArea") || document.querySelector(".main-image-area");
     let target = window.innerHeight * config.laneYRatio;
     if (treeArea) {
       const base = treeArea.getBoundingClientRect().bottom;
-      if (base > 0) target = base + rect.height * 0.28;
+      if (base > 0) target = base - rect.height * 0.32;
     }
     return Math.max(58, Math.min(window.innerHeight - rect.height - 6, target));
   };
@@ -2748,11 +2748,12 @@ function getEnvelopePosition(index, seedValue) {
   const jitterX = randomBetweenSeeded(random, -2.5, 2.5);
   const left = 50 + (t - 0.5) * spread + jitterX;
 
-  // Vertical: a SHALLOW stack of rows so the letters stay a low, grounded band
-  // hugging the tree base — never climbing up the trunk into the grass/sky.
-  const rowStep = 8;
-  const jitterY = randomBetweenSeeded(random, -2.5, 2.5);
-  const top = 22 + row * rowStep + jitterY;
+  // Vertical: a SHALLOW, COMPACT stack of rows packed into the bottom of the
+  // (now much shorter) garden box, hugging the trunk base as tightly as
+  // possible — never climbing up into the background hillside/sky.
+  const rowStep = 11;
+  const jitterY = randomBetweenSeeded(random, -3, 3);
+  const top = 46 + row * rowStep + jitterY;
 
   const rotate = randomBetweenSeeded(random, -9, 9);
   const scale = Math.max(0.6, 0.72 + row * 0.055 + randomBetweenSeeded(random, -0.05, 0.05));
