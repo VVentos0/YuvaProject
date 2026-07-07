@@ -26,6 +26,10 @@ const adminUsername = process.env.ADMIN_USERNAME || "admin";
 const adminPassword = process.env.ADMIN_PASSWORD || "";
 const adminCookieName = "yuva_admin";
 const chatAdminCookieName = "yuva_chat_admin";
+const sedoveiroPassword = process.env.SEDOVEIRO_PASSWORD || "ankara";
+const sedoveiroCookieName = "yuva_sedoveiro";
+// Writing is closed: the site is now a read-only archive. Set LETTERS_OPEN=true to re-enable.
+const lettersOpen = process.env.LETTERS_OPEN === "true";
 const youtubeApiKey = process.env.YOUTUBE_API_KEY || "";
 const defaultYuvaTvChannelId = process.env.YUVA_TV_CHANNEL_ID || "UCKO9BV0HNxQs5wttm1g2vQA";
 
@@ -100,6 +104,7 @@ const letterSchema = new mongoose.Schema(
     ipAddress: { type: String, trim: true, maxlength: 64, default: "" },
     ipHash: { type: String, default: "" },
     bodyHash: { type: String, default: "" },
+    readAt: { type: Date, default: null },
   },
   {
     timestamps: true,
@@ -265,6 +270,13 @@ const loginLimiter = rateLimit({
   legacyHeaders: false,
 });
 
+const sedoveiroLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 400,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 function isDatabaseHost(req) {
   return req.hostname.toLowerCase() === "database.yuvarchive.com";
 }
@@ -366,6 +378,27 @@ function toAdminLetter(letter) {
     ipAddress: letter.ipAddress || "",
     ipHash: letter.ipHash || "",
     updatedAt: letter.updatedAt,
+  };
+}
+
+// Recipient-facing view for the /sedoveiro reading room: full letter content and
+// its styling, plus read state — but never the IP / anti-spam fields.
+function toReaderLetter(letter) {
+  return {
+    id: letter._id.toString(),
+    recipient: letter.recipient,
+    createdAt: letter.createdAt,
+    author: letter.author,
+    anonymous: letter.anonymous,
+    title: letter.title,
+    body: letter.body,
+    paper: letter.paper,
+    color: letter.color,
+    senderColor: letter.senderColor,
+    font: letter.font,
+    envelope: letter.envelope,
+    sticker: letter.sticker,
+    readAt: letter.readAt || null,
   };
 }
 
@@ -655,6 +688,31 @@ function requireAdmin(req, res, next) {
   res.status(401).json({ error: "Unauthorized" });
 }
 
+function getSedoveiroCookieValue() {
+  const secret = adminToken || sedoveiroPassword;
+  if (!secret || !sedoveiroPassword) return "";
+
+  return crypto.createHmac("sha256", secret).update(`sedoveiro:${sedoveiroPassword}`).digest("hex");
+}
+
+function isSedoveiroAuthorized(req) {
+  const cookies = parseCookies(req);
+  const cookieValue = getSedoveiroCookieValue();
+
+  return Boolean(cookieValue && safeEqual(cookies[sedoveiroCookieName] || "", cookieValue));
+}
+
+function requireSedoveiro(req, res, next) {
+  sedoveiroLimiter(req, res, () => {
+    if (isSedoveiroAuthorized(req)) {
+      next();
+      return;
+    }
+
+    res.status(401).json({ error: "Unauthorized" });
+  });
+}
+
 function safeEqual(actual, expected) {
   const actualBuffer = Buffer.from(String(actual));
   const expectedBuffer = Buffer.from(String(expected));
@@ -841,6 +899,11 @@ app.get("/api/letters", async (req, res, next) => {
 
 app.post("/api/letters", writeBurstLimiter, writeLimiter, writeHourlyLimiter, async (req, res, next) => {
   try {
+    if (!lettersOpen) {
+      res.status(403).json({ error: "Mektup bırakma kapalı." });
+      return;
+    }
+
     const payload = normalizeLetter(req.body);
     const ipAddress = getClientIp(req);
     const ipHash = hashIp(ipAddress);
@@ -1294,6 +1357,79 @@ app.use(
 
 app.use("/images", (req, res) => {
   res.status(404).type("text/plain").send("Not found");
+});
+
+// --- /sedoveiro: password-gated reading room for SEDO & IRO recipients ---
+app.get("/sedoveiro", (req, res) => {
+  res.sendFile(path.join(__dirname, "sedoveiro.html"));
+});
+
+app.get("/sedoveiro.css", (req, res) => {
+  res.set("Cache-Control", "public, max-age=2592000, immutable");
+  res.sendFile(path.join(__dirname, "sedoveiro.css"));
+});
+
+app.get("/sedoveiro.js", (req, res) => {
+  res.set("Cache-Control", "no-cache");
+  res.sendFile(path.join(__dirname, "sedoveiro.js"));
+});
+
+app.post("/api/sedoveiro/login", (req, res) => {
+  loginLimiter(req, res, () => {
+    const password = String(req.body.password || "");
+
+    if (!sedoveiroPassword || !safeEqual(password, sedoveiroPassword)) {
+      res.status(401).json({ error: "Wrong password" });
+      return;
+    }
+
+    res.cookie(sedoveiroCookieName, getSedoveiroCookieValue(), {
+      httpOnly: true,
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+      sameSite: "lax",
+      secure: req.secure || req.get("x-forwarded-proto") === "https",
+    });
+    res.json({ ok: true });
+  });
+});
+
+app.post("/api/sedoveiro/logout", (req, res) => {
+  res.clearCookie(sedoveiroCookieName);
+  res.json({ ok: true });
+});
+
+app.get("/api/sedoveiro/letters", requireSedoveiro, async (req, res, next) => {
+  try {
+    const letters = await Letter.find({}).sort({ createdAt: -1 }).limit(1000).lean(false);
+    res.json({ letters: letters.map(toReaderLetter) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.patch("/api/sedoveiro/letters/:id/read", requireSedoveiro, async (req, res, next) => {
+  try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      res.status(400).json({ error: "Invalid id" });
+      return;
+    }
+
+    const read = req.body.read !== false; // default: mark as read
+    const letter = await Letter.findByIdAndUpdate(
+      req.params.id,
+      { readAt: read ? new Date() : null },
+      { new: true },
+    );
+
+    if (!letter) {
+      res.status(404).json({ error: "Not found" });
+      return;
+    }
+
+    res.json({ letter: toReaderLetter(letter) });
+  } catch (error) {
+    next(error);
+  }
 });
 
 app.get("*", (req, res) => {

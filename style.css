@@ -1720,6 +1720,87 @@ body.has-entered .write-button {
   transform: translate(-50%, calc(-50% - 4px)) rotate(-0.7deg);
 }
 
+/* "Mektupları Oku" — the central call to action. Reuses .write-button's
+   centering/fade/responsive positioning, but replaces the wooden sign image
+   with a distinct glowing dark-glass plaque. Compound selector (0,2,0) beats
+   every single-class .write-button rule in the media queries below. */
+.write-button.read-room-button {
+  width: auto;
+  min-width: calc(var(--stage-width) * 0.092);
+  height: auto;
+  aspect-ratio: auto;
+  padding: calc(var(--stage-width) * 0.0075) calc(var(--stage-width) * 0.0125);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: calc(var(--stage-width) * 0.0016);
+  border-radius: 14px;
+  border: 1.5px solid rgba(255, 224, 120, 0.72);
+  background:
+    radial-gradient(circle at 50% 0%, rgba(255, 226, 100, 0.18), transparent 60%),
+    linear-gradient(180deg, rgba(22, 28, 22, 0.94), rgba(9, 13, 9, 0.94));
+  color: #fff4b8;
+  text-decoration: none;
+  text-align: center;
+  font-family: "Jersey 15", "Pixelify Sans", "Courier New", monospace;
+  line-height: 1.04;
+  text-shadow: 0 0 8px rgba(255, 224, 101, 0.34);
+  box-shadow:
+    0 0 20px rgba(255, 221, 99, 0.3),
+    0 14px 30px rgba(0, 0, 0, 0.5),
+    inset 0 0 16px rgba(255, 221, 99, 0.08);
+  filter: none;
+  animation: readRoomPulse 3.4s ease-in-out infinite;
+}
+
+.write-button.read-room-button:hover,
+.write-button.read-room-button:focus-visible {
+  filter: brightness(1.06);
+  border-color: rgba(255, 240, 164, 0.95);
+  box-shadow:
+    0 0 28px rgba(255, 221, 99, 0.46),
+    0 18px 36px rgba(0, 0, 0, 0.55),
+    inset 0 0 18px rgba(255, 221, 99, 0.12);
+  transform: translate(-50%, calc(-50% - 3px));
+}
+
+/* Un-hide the label/icon that .write-button span/color rules would suppress. */
+.read-room-button .read-room-label,
+.read-room-button .read-room-icon {
+  position: static;
+  width: auto;
+  height: auto;
+  overflow: visible;
+  clip: auto;
+  white-space: normal;
+}
+
+.read-room-button .read-room-icon {
+  font-size: calc(var(--stage-width) * 0.017);
+  line-height: 1;
+  filter: drop-shadow(0 0 6px rgba(255, 224, 101, 0.55));
+}
+
+.read-room-button .read-room-label {
+  font-size: calc(var(--stage-width) * 0.0148);
+  letter-spacing: 0.5px;
+}
+
+@keyframes readRoomPulse {
+  0%, 100% {
+    box-shadow:
+      0 0 20px rgba(255, 221, 99, 0.28),
+      0 14px 30px rgba(0, 0, 0, 0.5),
+      inset 0 0 16px rgba(255, 221, 99, 0.08);
+  }
+  50% {
+    box-shadow:
+      0 0 30px rgba(255, 221, 99, 0.5),
+      0 14px 30px rgba(0, 0, 0, 0.5),
+      inset 0 0 20px rgba(255, 221, 99, 0.14);
+  }
+}
+
 /* Large-monitor UI padding: the stage composition itself now scales purely
    with viewport height (see :root), so no stage/element overrides are needed
    here — only the fixed-position corner UI gets extra breathing room. */

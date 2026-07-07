@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="tr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="robots" content="noindex,nofollow,noarchive" />
+    <title>YUVA · Mektup Odası</title>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@500;700;800&family=Playfair+Display:ital,wght@0,600;1,600&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Jersey+15&family=Pixelify+Sans:wght@500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/sedoveiro.css?v=20260706-1" />
+    <script src="/sedoveiro.js?v=20260706-1" defer></script>
+  </head>
+  <body>
+    <!-- Uçuşan ateşböcekleri (JS dolduruyor) -->
+    <div class="fireflies" id="fireflies" aria-hidden="true"></div>
+
+    <!-- ŞİFRE KAPISI -->
+    <section class="gate" id="gate" aria-label="Giriş">
+      <form class="gate-card" id="gateForm" autocomplete="off">
+        <div class="gate-mark">✶</div>
+        <h1 class="gate-title">Mektup Odası</h1>
+        <p class="gate-sub">Buraya bırakılan mektuplar seni bekliyor.</p>
+        <label class="gate-field">
+          <span>Şifre</span>
+          <input
+            id="gatePassword"
+            type="password"
+            name="password"
+            inputmode="text"
+            autocomplete="off"
+            placeholder="••••••"
+            required
+          />
+        </label>
+        <button class="gate-button" id="gateButton" type="submit">Gir</button>
+        <p class="gate-error" id="gateError" role="alert" hidden>Şifre yanlış.</p>
+      </form>
+      <p class="gate-foot">YUVA</p>
+    </section>
+
+    <!-- OKUMA ODASI -->
+    <main class="room" id="room" hidden>
+      <header class="room-head">
+        <div class="brand">
+          <span class="brand-star">✶</span>
+          <span class="brand-name">YUVA</span>
+          <span class="brand-sep">·</span>
+          <span class="brand-page">Mektup Odası</span>
+        </div>
+        <button class="ghost" id="logoutButton" type="button">Çıkış</button>
+      </header>
+
+      <section class="progress-wrap" aria-label="Okuma ilerlemesi">
+        <div class="progress-line">
+          <span id="progressText">0 / 0 okundu</span>
+          <span class="progress-pct" id="progressPct">%0</span>
+        </div>
+        <div class="progress-bar"><span id="progressFill"></span></div>
+      </section>
+
+      <nav class="tabs" role="tablist" aria-label="Alıcı">
+        <button class="tab is-active" id="tabSEDO" role="tab" data-recipient="SEDO">
+          <span class="tab-name">SEDO</span>
+          <span class="tab-count" id="countSEDO">0</span>
+          <span class="tab-badge" id="badgeSEDO" hidden>0</span>
+        </button>
+        <button class="tab" id="tabIRO" role="tab" data-recipient="IRO">
+          <span class="tab-name">IRO</span>
+          <span class="tab-count" id="countIRO">0</span>
+          <span class="tab-badge" id="badgeIRO" hidden>0</span>
+        </button>
+      </nav>
+
+      <div class="toolbar">
+        <div class="seg" id="filterSeg" role="group" aria-label="Filtre">
+          <button class="seg-btn is-active" data-filter="all" type="button">Tümü</button>
+          <button class="seg-btn" data-filter="unread" type="button">Okunmamış</button>
+        </div>
+        <label class="sort">
+          <span>Sırala</span>
+          <select id="sortSelect">
+            <option value="new">Yeni → Eski</option>
+            <option value="old">Eski → Yeni</option>
+            <option value="unread">Önce okunmamış</option>
+          </select>
+        </label>
+      </div>
+
+      <section class="grid" id="grid" aria-live="polite"></section>
+      <p class="empty" id="empty" hidden>Burada gösterilecek mektup yok.</p>
+    </main>
+
+    <!-- OKUMA MODALI -->
+    <div class="reader" id="reader" hidden>
+      <div class="reader-backdrop" id="readerBackdrop"></div>
+      <div class="reader-stage" role="dialog" aria-modal="true" aria-label="Mektup">
+        <button class="reader-nav reader-prev" id="readerPrev" type="button" aria-label="Önceki">‹</button>
+
+        <article class="letter-sheet" id="letterSheet">
+          <span class="sheet-sticker" id="sheetSticker" aria-hidden="true"></span>
+          <div class="sheet-meta" id="sheetMeta"></div>
+          <h2 class="sheet-title" id="sheetTitle"></h2>
+          <p class="sheet-body" id="sheetBody"></p>
+          <p class="sheet-sign" id="sheetSign"></p>
+        </article>
+
+        <button class="reader-nav reader-next" id="readerNext" type="button" aria-label="Sonraki">›</button>
+
+        <div class="reader-bar">
+          <span class="reader-pos" id="readerPos"></span>
+          <div class="reader-actions">
+            <button class="ghost small" id="toggleReadButton" type="button">Okunmadı işaretle</button>
+            <button class="ghost small" id="readerClose" type="button">Kapat ✕</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <audio id="letterSound" src="/sounds/letter.mp3" preload="auto"></audio>
+  </body>
+</html>

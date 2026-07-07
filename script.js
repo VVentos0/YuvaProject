@@ -100,7 +100,7 @@ const aboutYuvaDialog = document.querySelector("#aboutYuvaDialog");
 const envelopeLockedDialog = document.querySelector("#envelopeLockedDialog");
 const wishIntroDialog = document.querySelector("#wishIntroDialog");
 const wishFormDialog = document.querySelector("#wishFormDialog");
-const openLetterModal = document.querySelector("#openLetterModal");
+const readRoomButton = document.querySelector("#readRoomButton");
 const closeLetterModal = document.querySelector("#closeLetterModal");
 const closeRibbonDialog = document.querySelector("#closeRibbonDialog");
 const closeStarDialog = document.querySelector("#closeStarDialog");
@@ -1741,16 +1741,13 @@ function bindEvents() {
     showToast("Dileğin gökyüzünde kaldı.");
   });
 
-  openLetterModal.addEventListener("click", () => {
+  readRoomButton.addEventListener("click", () => {
     playEffectSound("letterClick");
-    letterFormStartedAt = Date.now();
-    if (letterWebsite) letterWebsite.value = "";
-    letterDialog.showModal();
-    letterBody.focus();
+    // Navigation to /sedoveiro is handled by the anchor's href.
   });
   if (window.matchMedia("(hover: hover) and (pointer: fine)").matches) {
-    openLetterModal.addEventListener("pointerenter", playLetterHoverSound);
-    openLetterModal.addEventListener("pointerleave", stopLetterHoverSound);
+    readRoomButton.addEventListener("pointerenter", playLetterHoverSound);
+    readRoomButton.addEventListener("pointerleave", stopLetterHoverSound);
   }
 
   closeLetterModal.addEventListener("click", () => letterDialog.close());
