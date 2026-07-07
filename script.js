@@ -2245,7 +2245,7 @@ function initRoamingCat() {
     offscreenPadding: 120,
     speedMin: 0.34,
     speedMax: 0.58,
-    laneYRatio: 0.84,
+    laneYRatio: 0.9, // walk along the foreground grass, below the letter pile
     sitMin: 1800,
     sitMax: 5200,
     walkMin: 3600,
@@ -2728,20 +2728,22 @@ function getEnvelopePosition(index, seedValue) {
   const slot = index % perRing;
   const random = seededRandom(seedValue);
   const angle = 176 - slot * (172 / (perRing - 1)) + ring * 4;
-  const radiusX = 24 + ring * 7.8 + randomBetweenSeeded(random, -5, 8);
-  const radiusY = 7 + ring * 2.2 + randomBetweenSeeded(random, -2, 4);
+  // Wider horizontal spread + shallower vertical drift so the letters fan out
+  // into a nicer arc and leave clear foreground grass for the roaming cat.
+  const radiusX = 27 + ring * 9.4 + randomBetweenSeeded(random, -5, 9);
+  const radiusY = 7 + ring * 2 + randomBetweenSeeded(random, -2, 4);
   const centerX = 50;
-  const centerY = 50;
-  const jitterX = randomBetweenSeeded(random, -7, 7);
+  const centerY = 49;
+  const jitterX = randomBetweenSeeded(random, -8, 8);
   const jitterY = randomBetweenSeeded(random, -4, 5);
   const left = centerX + Math.cos((angle * Math.PI) / 180) * radiusX + jitterX;
-  const top = centerY + Math.abs(Math.sin((angle * Math.PI) / 180)) * radiusY + ring * 2.7 + jitterY;
+  const top = centerY + Math.abs(Math.sin((angle * Math.PI) / 180)) * radiusY + ring * 1.9 + jitterY;
   const rotate = randomBetweenSeeded(random, -8, 8);
   const scale = Math.max(0.62, 1 - ring * 0.045 + randomBetweenSeeded(random, -0.07, 0.08));
 
   return {
-    left: Math.max(4, Math.min(96, left)),
-    top: Math.max(42, Math.min(86, top)),
+    left: Math.max(3, Math.min(97, left)),
+    top: Math.max(42, Math.min(81, top)),
     rotate,
     scale,
     bobDuration: randomBetweenSeeded(random, 3.1, 4.8),
