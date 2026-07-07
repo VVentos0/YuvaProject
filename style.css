@@ -241,9 +241,11 @@ body {
   animation-delay: -420ms;
 }
 
+/* Play state swaps the GIF only and keeps the EXACT same box as the sleeping
+   state. Previously it shrank + moved the cat, so hovering near an edge pulled
+   the cat out from under the cursor → rapid mouseenter/mouseleave flicker. */
 .right-scene-curtain-cat.is-playing {
-  width: calc(var(--stage-width) * 0.0417);
-  transform: translate(calc(-50% - 20px), calc(-50% - 12px));
+  filter: brightness(1.05) saturate(1.04);
 }
 
 .right-scene-people-layer {
@@ -610,6 +612,26 @@ body {
 
 .scene-arrow--left img {
   transform: scaleX(-1);
+}
+
+/* Gentle "there's more this way" nudge on the scene arrows. Animates the inner
+   icon (not the button) so it never fights the hover scale on the container. */
+.scene-arrow--right img {
+  animation: arrowNudgeRight 1.9s ease-in-out infinite;
+}
+
+.scene-arrow--left img {
+  animation: arrowNudgeLeft 1.9s ease-in-out infinite;
+}
+
+@keyframes arrowNudgeRight {
+  0%, 100% { transform: translateX(0); }
+  50% { transform: translateX(3px); }
+}
+
+@keyframes arrowNudgeLeft {
+  0%, 100% { transform: scaleX(-1) translateX(0); }
+  50% { transform: scaleX(-1) translateX(3px); }
 }
 
 .scene-arrow::before {
@@ -3610,7 +3632,8 @@ dialog::backdrop {
   }
 
   .right-scene-curtain-cat.is-playing {
-    width: min(8.2vw, 58px);
+    /* keep the sleeping-state box (no shrink) to avoid the hover flicker loop */
+    width: min(15vw, 105px);
   }
 
   .right-scene-fire-wrap {
@@ -4033,8 +4056,9 @@ dialog::backdrop {
   }
 
   .right-scene-curtain-cat.is-playing {
-    width: min(7.2vw, 46px);
-    transform: translate(calc(-50% - 12px), calc(-50% - 8px));
+    /* keep the sleeping-state box (no shrink/move) to avoid the hover flicker */
+    width: min(13vw, 78px);
+    transform: translate(calc(-50% - 12px), calc(-50% + 3px));
   }
 
   .right-scene-fire-wrap {
@@ -4556,21 +4580,10 @@ dialog::backdrop {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .welcome-content,
-  .welcome-screen::before {
-    animation: none !important;
-  }
-
-  .welcome-screen.is-leaving {
-    animation-duration: 400ms !important;
-  }
-
-  *,
-  *::before,
-  *::after {
-    scroll-behavior: auto !important;
-    animation-duration: 0.001ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.001ms !important;
+  /* YUVA is fundamentally an animated pixel-art world — its motion is the
+     experience, so we intentionally keep the ambient/interaction animations
+     even when reduced-motion is requested. We only drop smooth scrolling. */
+  html {
+    scroll-behavior: auto;
   }
 }

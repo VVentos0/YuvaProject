@@ -62,6 +62,7 @@
     sort: "new",
     snapshot: [], // ids in reader-navigation order
     index: -1,
+    firstRender: true, // gradual staggered reveal only on the very first grid paint
   };
 
   const dateFmt = new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium" });
@@ -166,12 +167,16 @@
     }
     emptyMsg.hidden = true;
 
+    // Gradual "letters arriving" reveal on first open; snappier on re-renders.
+    const step = state.firstRender ? 26 : 8;
+    const cap = state.firstRender ? 1500 : 320;
+
     list.forEach((letter, i) => {
       const card = document.createElement("button");
       card.type = "button";
       card.className = "env-card " + (letter.readAt ? "is-read" : "is-unread");
       card.dataset.id = letter.id;
-      card.style.setProperty("--stagger", Math.min(i * 22, 400) + "ms");
+      card.style.setProperty("--stagger", Math.min(i * step, cap) + "ms");
       card.setAttribute("aria-label", `${letter.recipient} · ${senderLabel(letter)} · ${letter.readAt ? "okundu" : "okunmadı"}`);
 
       const check = document.createElement("span");
@@ -205,15 +210,30 @@
       card.addEventListener("click", () => openReader(letter.id));
       grid.appendChild(card);
     });
+
+    state.firstRender = false;
+  }
+
+  // Lightweight in-place update of one card's read state (no full re-render, so
+  // the grid doesn't re-run its entrance animation while a letter is open).
+  function updateCardState(id) {
+    const card = grid.querySelector(`.env-card[data-id="${id}"]`);
+    const letter = state.letters.find((l) => l.id === id);
+    if (!card || !letter) return;
+    card.classList.toggle("is-read", !!letter.readAt);
+    card.classList.toggle("is-unread", !letter.readAt);
   }
 
   // ---------- reader ----------
   function renderSheet(letter, swap) {
-    letterSheet.className = "letter-sheet";
-    letterSheet.classList.add("paper-" + (PAPER.includes(letter.paper) ? letter.paper : "warm"));
-    letterSheet.classList.add("font-" + (FONTS.includes(letter.font) ? letter.font : "modern"));
-    if (swap) letterSheet.classList.add("swap");
-    if (letter.color) letterSheet.style.color = letter.color;
+    const paper = "paper-" + (PAPER.includes(letter.paper) ? letter.paper : "warm");
+    const font = "font-" + (FONTS.includes(letter.font) ? letter.font : "modern");
+    // Reset then force reflow so the open/swap animation (and the staggered
+    // inner-content reveal below) restarts cleanly on every letter.
+    letterSheet.className = "letter-sheet " + paper + " " + font;
+    void letterSheet.offsetWidth;
+    letterSheet.classList.add(swap ? "swapping" : "opening");
+    letterSheet.style.color = letter.color || "";
 
     sheetMeta.textContent = "";
     sheetMeta.append(
@@ -253,14 +273,16 @@
     if (!letter || letter.readAt) return;
     // optimistic
     letter.readAt = new Date().toISOString();
-    renderGrid();
+    renderStats();
+    updateCardState(letter.id);
     updateReaderControls();
     try {
       const updated = await patchRead(letter.id, true);
       if (updated) letter.readAt = updated.readAt;
     } catch (e) {
       letter.readAt = null; // revert on failure
-      renderGrid();
+      renderStats();
+      updateCardState(letter.id);
       updateReaderControls();
     }
   }
@@ -308,14 +330,16 @@
     const next = !letter.readAt;
     const prev = letter.readAt;
     letter.readAt = next ? new Date().toISOString() : null;
-    renderGrid();
+    renderStats();
+    updateCardState(letter.id);
     updateReaderControls();
     try {
       const updated = await patchRead(letter.id, next);
       if (updated) letter.readAt = updated.readAt;
     } catch (e) {
       letter.readAt = prev;
-      renderGrid();
+      renderStats();
+      updateCardState(letter.id);
       updateReaderControls();
     }
   }
@@ -352,7 +376,11 @@
       if (!res.ok) throw new Error("bad");
       const letters = await fetchLetters();
       if (letters === null) throw new Error("bad");
+      // Animate the gate away, then reveal the room.
+      gate.classList.add("is-leaving");
+      await new Promise((r) => setTimeout(r, 460));
       enterRoom(letters);
+      return;
     } catch (e) {
       gateError.hidden = false;
       gateCard.classList.remove("shake");

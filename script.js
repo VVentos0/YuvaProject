@@ -1468,8 +1468,8 @@ function initYuvaTv() {
   showYuvaTvMessage(yuvaTvVideos.length ? "Başlat" : "Video bekliyor");
   setYuvaTvControlsDisabled(!yuvaTvVideos.length);
 
-  yuvaTvPlayerHost.addEventListener("click", startYuvaTv);
-  yuvaTvPlayPause?.addEventListener("click", stopYuvaTv);
+  yuvaTvPlayerHost.addEventListener("click", toggleYuvaTv);
+  yuvaTvPlayPause?.addEventListener("click", toggleYuvaTv);
   yuvaTvMute?.addEventListener("click", toggleYuvaTvMute);
   yuvaTvNext?.addEventListener("click", () => playNextYuvaTvVideo({ manual: true }));
 }
@@ -1485,6 +1485,27 @@ async function startYuvaTv() {
   yuvaTvBrokenIndexes.clear();
   setYuvaTvControlsDisabled(false);
   await loadYuvaTvVideo(yuvaTvIndex, { autoplay: true });
+}
+
+// Clicking the screen (or the play/pause button) toggles instead of restarting:
+// start if not playing yet, otherwise pause/resume the current video.
+function toggleYuvaTv() {
+  if (!yuvaTvStarted || !yuvaTvReady || !yuvaTvPlayer) {
+    startYuvaTv();
+    return;
+  }
+
+  const video = yuvaTvVideos[yuvaTvIndex];
+  if (video?.type === "file") {
+    if (yuvaTvPlayer.paused) yuvaTvPlayer.play?.().catch(() => {});
+    else yuvaTvPlayer.pause?.();
+  } else {
+    const state = yuvaTvPlayer.getPlayerState?.();
+    // YT.PlayerState: 1 = playing, 3 = buffering
+    if (state === 1 || state === 3) yuvaTvPlayer.pauseVideo?.();
+    else yuvaTvPlayer.playVideo?.();
+  }
+  updateYuvaTvButtons?.();
 }
 
 async function loadYuvaTvVideo(index, options = {}) {
