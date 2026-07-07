@@ -2259,7 +2259,16 @@ function initRoamingCat() {
   const pointerWorldX = (event) => event.clientX + getSceneViewportOffset();
   const laneY = () => {
     const rect = catSize();
-    return Math.max(58, Math.min(window.innerHeight - rect.height - 18, window.innerHeight * config.laneYRatio));
+    // Anchor the cat to the tree base so it walks just in front of the grounded
+    // letters on every aspect ratio (the letters track the base too). The base
+    // is stage-anchored, unlike a flat viewport ratio, so they never diverge.
+    const treeArea = document.querySelector("#treeHitArea") || document.querySelector(".main-image-area");
+    let target = window.innerHeight * config.laneYRatio;
+    if (treeArea) {
+      const base = treeArea.getBoundingClientRect().bottom;
+      if (base > 0) target = base + rect.height * 0.28;
+    }
+    return Math.max(58, Math.min(window.innerHeight - rect.height - 6, target));
   };
   const clampCat = () => {
     const rect = catSize();
@@ -2723,27 +2732,34 @@ function showEnvelopeLockedMessage() {
 }
 
 function getEnvelopePosition(index, seedValue) {
-  const perRing = 18;
-  const ring = Math.floor(index / perRing);
-  const slot = index % perRing;
+  // Letters lie flat on the grass in front of the tree, fanned wide left→right
+  // in a few rows. NO upward arc — every row simply stacks downward so nothing
+  // ever floats up into the sky. The garden box (CSS) is kept entirely within
+  // the grass band, so filling it 0–100% guarantees the letters stay grounded.
+  const perRow = 24;
+  const row = Math.floor(index / perRow);
+  const slot = index % perRow;
   const random = seededRandom(seedValue);
-  const angle = 176 - slot * (172 / (perRing - 1)) + ring * 4;
-  // Wider horizontal spread + shallower vertical drift so the letters fan out
-  // into a nicer arc and leave clear foreground grass for the roaming cat.
-  const radiusX = 27 + ring * 9.4 + randomBetweenSeeded(random, -5, 9);
-  const radiusY = 7 + ring * 2 + randomBetweenSeeded(random, -2, 4);
-  const centerX = 50;
-  const centerY = 49;
-  const jitterX = randomBetweenSeeded(random, -8, 8);
-  const jitterY = randomBetweenSeeded(random, -4, 5);
-  const left = centerX + Math.cos((angle * Math.PI) / 180) * radiusX + jitterX;
-  const top = centerY + Math.abs(Math.sin((angle * Math.PI) / 180)) * radiusY + ring * 1.9 + jitterY;
-  const rotate = randomBetweenSeeded(random, -8, 8);
-  const scale = Math.max(0.62, 1 - ring * 0.045 + randomBetweenSeeded(random, -0.07, 0.08));
+
+  // Horizontal: spread across the width; back rows a touch narrower so the pile
+  // gathers toward the middle and fans out to the sides.
+  const t = perRow === 1 ? 0.5 : slot / (perRow - 1); // 0..1 across the row
+  const spread = 94 - row * 4;
+  const jitterX = randomBetweenSeeded(random, -2.5, 2.5);
+  const left = 50 + (t - 0.5) * spread + jitterX;
+
+  // Vertical: a SHALLOW stack of rows so the letters stay a low, grounded band
+  // hugging the tree base — never climbing up the trunk into the grass/sky.
+  const rowStep = 8;
+  const jitterY = randomBetweenSeeded(random, -2.5, 2.5);
+  const top = 22 + row * rowStep + jitterY;
+
+  const rotate = randomBetweenSeeded(random, -9, 9);
+  const scale = Math.max(0.6, 0.72 + row * 0.055 + randomBetweenSeeded(random, -0.05, 0.05));
 
   return {
-    left: Math.max(3, Math.min(97, left)),
-    top: Math.max(42, Math.min(81, top)),
+    left: Math.max(2, Math.min(98, left)),
+    top: Math.max(2, Math.min(98, top)),
     rotate,
     scale,
     bobDuration: randomBetweenSeeded(random, 3.1, 4.8),

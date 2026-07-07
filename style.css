@@ -1238,11 +1238,15 @@ button {
 
 .envelope-garden {
   position: absolute;
-  top: 72%;
-  left: 46%;
+  /* Top is kept well below the painted horizon (~52% of the stage) so no letter
+     can ever land in the sky; the box reaches down to the tree base so the pile
+     sits on the grass. Width is capped to the viewport on cover aspects (4:3)
+     so the fan never spills onto the corner props. */
+  top: 71%;
+  left: 50%;
   z-index: 4;
-  width: calc(var(--stage-width) * 0.5104);
-  height: calc(var(--stage-width) * 0.125);
+  width: min(calc(var(--stage-width) * 0.82), 90vw);
+  height: calc(var(--stage-width) * 0.115);
   pointer-events: auto;
   transform: translateX(-50%);
 }
@@ -1253,8 +1257,8 @@ button {
    large widths so 16:9/16:10/4K desktops and landscape phones are untouched. */
 @media (min-aspect-ratio: 2 / 1) and (min-width: 1100px) {
   .envelope-garden {
-    top: 67%;
-    height: calc(var(--stage-width) * 0.104);
+    top: 68%;
+    height: calc(var(--stage-width) * 0.098);
   }
 }
 
@@ -1753,15 +1757,18 @@ body.has-entered .write-button {
    every single-class .write-button rule in the media queries below. */
 .write-button.read-room-button {
   width: auto;
-  min-width: calc(var(--stage-width) * 0.092);
+  /* Size scales with the scene on wide screens but is capped to the viewport on
+     phones (where --stage-width is height-driven and huge), so the plaque stays
+     small on the trunk instead of swallowing the whole tree. */
+  min-width: min(calc(var(--stage-width) * 0.092), 24vw);
   height: auto;
   aspect-ratio: auto;
-  padding: calc(var(--stage-width) * 0.0075) calc(var(--stage-width) * 0.0125);
+  padding: min(calc(var(--stage-width) * 0.0075), 1.2vh) min(calc(var(--stage-width) * 0.0125), 3vw);
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: calc(var(--stage-width) * 0.0016);
-  border-radius: 14px;
+  gap: min(calc(var(--stage-width) * 0.0016), 0.4vw);
+  border-radius: min(14px, 2.6vw);
   border: 1.5px solid rgba(255, 224, 120, 0.72);
   background:
     radial-gradient(circle at 50% 0%, rgba(255, 226, 100, 0.18), transparent 60%),
@@ -1803,13 +1810,13 @@ body.has-entered .write-button {
 }
 
 .read-room-button .read-room-icon {
-  font-size: calc(var(--stage-width) * 0.017);
+  font-size: min(calc(var(--stage-width) * 0.017), 4.8vw);
   line-height: 1;
   filter: drop-shadow(0 0 6px rgba(255, 224, 101, 0.55));
 }
 
 .read-room-button .read-room-label {
-  font-size: calc(var(--stage-width) * 0.0148);
+  font-size: min(calc(var(--stage-width) * 0.0148), 3.8vw);
   letter-spacing: 0.5px;
 }
 
@@ -4364,10 +4371,10 @@ dialog::backdrop {
   }
 
   .envelope-garden {
-    top: calc(var(--port-tree-cy) + var(--port-tree-h) * 0.36);
+    top: calc(var(--port-tree-cy) + var(--port-tree-h) * 0.28);
     left: 50%;
-    width: calc(var(--port-scale) * 0.94);
-    height: calc(var(--port-scale) * 0.15);
+    width: calc(var(--port-scale) * 0.96);
+    height: calc(var(--port-scale) * 0.17);
     margin: 0;
     order: initial;
   }
@@ -4528,10 +4535,10 @@ dialog::backdrop {
 
   .envelope-garden {
     position: absolute;
-    top: 72%;
-    left: 46%;
-    width: calc(var(--stage-width) * 0.5104);
-    height: calc(var(--stage-width) * 0.125);
+    top: 69%;
+    left: 50%;
+    width: min(calc(var(--stage-width) * 0.82), 92vw);
+    height: calc(var(--stage-width) * 0.088);
     margin-top: 0;
     order: initial;
     transform: translateX(-50%);
