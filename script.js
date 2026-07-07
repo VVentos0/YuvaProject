@@ -197,6 +197,9 @@ let treeHitHasUsableAlpha = false;
 let treeHitUsesMask = false;
 let treePointerIsOpaque = false;
 let treePointerFrame = 0;
+let treeSoundLastPlayedAt = -Infinity;
+const TREE_SOUND_COOLDOWN_MS = 10000;
+const TREE_HIT_MARGIN_PX = 3; // small grace radius (source-image px), not a loose shape guess
 let birdHitCanvas;
 let birdHitContext;
 let birdHitSourceImage;
@@ -284,7 +287,9 @@ function initSounds() {
 
   sounds.background.loop = true;
   sounds.background.volume = 0.45;
-  sounds.tree.loop = true;
+  // Plays once per trigger (not looped) so a quick hover-out/in doesn't restart
+  // it mid-loop; playTreeSound()'s cooldown keeps it from re-triggering.
+  sounds.tree.loop = false;
   sounds.tree.volume = 0.045;
   sounds.cat.volume = 0.06;
   sounds.cd.volume = 0.055;
@@ -316,13 +321,39 @@ function stopBackgroundSound() {
   sounds.background.pause();
 }
 
+// Ramps the background music down to silence before handing off to `onDone`
+// (used before navigating away, e.g. to /sedoveiro) instead of cutting it off
+// abruptly.
+function fadeOutBackgroundSound(durationMs, onDone) {
+  const audio = sounds?.background;
+  if (!audio || audio.paused) {
+    onDone?.();
+    return;
+  }
+
+  const startVolume = audio.volume;
+  const steps = 16;
+  const stepMs = durationMs / steps;
+  let step = 0;
+
+  const timer = window.setInterval(() => {
+    step += 1;
+    audio.volume = Math.max(0, startVolume * (1 - step / steps));
+    if (step >= steps) {
+      window.clearInterval(timer);
+      audio.pause();
+      audio.volume = startVolume;
+      onDone?.();
+    }
+  }, stepMs);
+}
+
 function playTreeSound() {
   if (!sounds?.tree || !effectsEnabled) return;
-  if (Number.isFinite(sounds.tree.duration) && sounds.tree.duration > 1) {
-    sounds.tree.currentTime = Math.random() * Math.max(0, sounds.tree.duration - 0.5);
-  } else {
-    sounds.tree.currentTime = 0;
-  }
+  const now = performance.now();
+  if (now - treeSoundLastPlayedAt < TREE_SOUND_COOLDOWN_MS) return;
+  treeSoundLastPlayedAt = now;
+  sounds.tree.currentTime = 0;
   sounds.tree.play().catch(() => {});
 }
 
@@ -480,22 +511,31 @@ function isPointerOnOpaquePixel(event) {
   }
 
   try {
-    const safeX = Math.max(0, Math.min(treeHitCanvas.width - 1, point.x));
-    const safeY = Math.max(0, Math.min(treeHitCanvas.height - 1, point.y));
-    const alpha = treeHitContext.getImageData(safeX, safeY, 1, 1).data[3];
-    const isOpaque = alpha > TREE_ALPHA_THRESHOLD;
-    const approximateOpaque = isPointerInApproximateTreeShape(point);
-    const finalOpaque = isOpaque || (!treeHitUsesMask && approximateOpaque && alpha <= TREE_ALPHA_THRESHOLD);
+    // Real alpha data is available here (mask or GIF), so trust it directly —
+    // only a small pixel-radius grace margin is added, not the old loose
+    // ellipse guess, which was large enough to cover visible sky between
+    // branches and made almost the whole bounding box "feel" like tree.
+    const minX = Math.max(0, point.x - TREE_HIT_MARGIN_PX);
+    const minY = Math.max(0, point.y - TREE_HIT_MARGIN_PX);
+    const maxX = Math.min(treeHitCanvas.width - 1, point.x + TREE_HIT_MARGIN_PX);
+    const maxY = Math.min(treeHitCanvas.height - 1, point.y + TREE_HIT_MARGIN_PX);
+    const blockWidth = maxX - minX + 1;
+    const blockHeight = maxY - minY + 1;
+    const data = treeHitContext.getImageData(minX, minY, blockWidth, blockHeight).data;
+    let isOpaque = false;
+    for (let i = 3; i < data.length; i += 4) {
+      if (data[i] > TREE_ALPHA_THRESHOLD) {
+        isOpaque = true;
+        break;
+      }
+    }
     logTreeHitDebug("hit-test alpha", {
-      x: safeX,
-      y: safeY,
-      alpha,
-      isOpaque: finalOpaque,
-      alphaOpaque: isOpaque,
-      approximateOpaque,
+      x: point.x,
+      y: point.y,
+      isOpaque,
       source: treeHitUsesMask ? "mask" : "gif",
     });
-    return finalOpaque;
+    return isOpaque;
   } catch (error) {
     console.warn("Tree alpha hit-test failed.", error);
     const approximateOpaque = isPointerInApproximateTreeShape(point);
@@ -529,7 +569,8 @@ function logTreeHitDebug(message, details) {
 function setTreeActiveState(active) {
   treePointerIsOpaque = active;
   mainImageArea?.classList.toggle("is-tree-hovered", active);
-  if (!active) stopTreeSound();
+  // Sound is intentionally NOT stopped here: once triggered it plays through
+  // to the end on its own, even if the pointer leaves the tree immediately.
 }
 
 function triggerTreeInteraction() {
@@ -1762,9 +1803,13 @@ function bindEvents() {
     showToast("Dileğin gökyüzünde kaldı.");
   });
 
-  readRoomButton.addEventListener("click", () => {
+  readRoomButton.addEventListener("click", (event) => {
     playEffectSound("letterClick");
-    // Navigation to /sedoveiro is handled by the anchor's href.
+    const destination = readRoomButton.getAttribute("href") || "/sedoveiro";
+    event.preventDefault();
+    fadeOutBackgroundSound(650, () => {
+      window.location.href = destination;
+    });
   });
   if (window.matchMedia("(hover: hover) and (pointer: fine)").matches) {
     readRoomButton.addEventListener("pointerenter", playLetterHoverSound);
