@@ -198,7 +198,9 @@ let treeHitUsesMask = false;
 let treePointerIsOpaque = false;
 let treePointerFrame = 0;
 let treeSoundLastPlayedAt = -Infinity;
+let treeSoundStopTimer = 0;
 const TREE_SOUND_COOLDOWN_MS = 10000;
+const TREE_SOUND_MAX_MS = 3000;
 const TREE_HIT_MARGIN_PX = 3; // small grace radius (source-image px), not a loose shape guess
 let birdHitCanvas;
 let birdHitContext;
@@ -355,6 +357,12 @@ function playTreeSound() {
   treeSoundLastPlayedAt = now;
   sounds.tree.currentTime = 0;
   sounds.tree.play().catch(() => {});
+  // Safety net: the clip is trimmed to ~3s, but force-stop at exactly 3s
+  // regardless (mp3 container padding, a future longer file, etc.).
+  window.clearTimeout(treeSoundStopTimer);
+  treeSoundStopTimer = window.setTimeout(() => {
+    if (sounds?.tree) sounds.tree.pause();
+  }, TREE_SOUND_MAX_MS);
 }
 
 function stopTreeSound() {
