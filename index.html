@@ -16,7 +16,7 @@
       href="https://fonts.googleapis.com/css2?family=Jersey+15&family=Pixelify+Sans:wght@500;600;700&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="style.css?v=20260707-catsize" />
+    <link rel="stylesheet" href="style.css?v=20260708-mektup" />
   </head>
   <body>
     <div class="sliding-world" id="slidingWorld">
@@ -45,6 +45,10 @@
             <div class="blue-square" tabindex="0"><img alt="Anı görseli 5" /></div>
             <div class="blue-square" tabindex="0"><img alt="Anı görseli 6" /></div>
           </section>
+
+          <button class="write-button safe-zone" id="openLetterModal" type="button" aria-label="Mektup Yaz" hidden>
+            <span>Mektup Yaz</span>
+          </button>
 
           <a class="write-button read-room-button safe-zone" id="readRoomButton" href="/sedoveiro" aria-label="Mektupları Oku">
             <span class="read-room-icon" aria-hidden="true">✉</span>
@@ -416,6 +420,6 @@
     </dialog>
 
     <script src="/socket.io/socket.io.js"></script>
-    <script src="script.js?v=20260708-tree-hit-fix"></script>
+    <script src="script.js?v=20260708-mektup"></script>
   </body>
 </html>

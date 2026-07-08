@@ -1253,7 +1253,7 @@ button {
      reads as "sky" too, so the pile must sit deep in the near foreground grass,
      hugging the trunk base, not partway up the scene. Width is capped to the
      viewport on cover aspects (4:3) so the fan never spills onto corner props. */
-  top: 83%;
+  top: 80%;
   left: 50%;
   z-index: 4;
   width: min(calc(var(--stage-width) * 0.82), 90vw);
@@ -1268,7 +1268,7 @@ button {
    large widths so 16:9/16:10/4K desktops and landscape phones are untouched. */
 @media (min-aspect-ratio: 2 / 1) and (min-width: 1100px) {
   .envelope-garden {
-    top: 79%;
+    top: 73%;
     height: calc(var(--stage-width) * 0.058);
   }
 }
@@ -1362,7 +1362,7 @@ button {
   top: 0;
   left: 0;
   z-index: 18;
-  width: clamp(66px, 5.8vw, 102px);
+  width: clamp(80px, 7vw, 124px);
   aspect-ratio: 4 / 3;
   opacity: 0.95;
   padding: 0;
@@ -1739,6 +1739,14 @@ button {
 body.has-entered .write-button {
   opacity: 1;
   pointer-events: auto;
+}
+
+/* .write-button.read-room-button sets its own `display`, which (being author
+   CSS) otherwise beats the browser's built-in `[hidden]{display:none}` — so
+   without this, toggling `hidden` between the write/read-room buttons does
+   nothing visually. */
+.write-button[hidden] {
+  display: none !important;
 }
 
 .write-button span {
@@ -3720,7 +3728,7 @@ dialog::backdrop {
   .envelope-garden {
     width: min(96vw, 640px);
     height: clamp(120px, 28vw, 170px);
-    margin-top: clamp(-72px, -11vw, -38px);
+    margin-top: clamp(-84px, -13vw, -46px);
     order: 2;
   }
 
@@ -3758,7 +3766,7 @@ dialog::backdrop {
   }
 
   .roaming-cat {
-    width: clamp(58px, 16vw, 84px);
+    width: clamp(70px, 19vw, 100px);
   }
 
   .letter-modal {
@@ -3987,7 +3995,7 @@ dialog::backdrop {
   }
 
   .envelope-garden {
-    top: 67%;
+    top: 64%;
     left: 50%;
     width: min(86vw, 420px);
     height: clamp(86px, 20vw, 118px);
@@ -4021,7 +4029,7 @@ dialog::backdrop {
   }
 
   .roaming-cat {
-    width: clamp(46px, 13vw, 68px);
+    width: clamp(56px, 15vw, 82px);
   }
 
   .right-scene-people-layer {
@@ -4261,7 +4269,7 @@ dialog::backdrop {
   .envelope-garden {
     width: 100vw;
     height: 124px;
-    margin-top: -48px;
+    margin-top: -58px;
   }
 
   .write-button {
@@ -4382,7 +4390,7 @@ dialog::backdrop {
   }
 
   .envelope-garden {
-    top: calc(var(--port-tree-cy) + var(--port-tree-h) * 0.46);
+    top: calc(var(--port-tree-cy) + var(--port-tree-h) * 0.4);
     left: 50%;
     width: calc(var(--port-scale) * 0.96);
     height: calc(var(--port-scale) * 0.105);
@@ -4427,13 +4435,16 @@ dialog::backdrop {
   }
 
   .scene-sign {
-    top: 82%;
+    /* Same tree-anchored formula as .write-button/.envelope-garden above, so the
+       sign's feet land on the tree's own ground line at every portrait aspect
+       ratio instead of a flat vh% that drifts relative to the tree. */
+    top: calc(var(--port-tree-cy) + var(--port-tree-h) * 0.381);
     left: max(10px, env(safe-area-inset-left));
     width: calc(var(--port-scale) * 0.145);
   }
 
   .roaming-cat {
-    width: calc(var(--port-scale) * 0.13);
+    width: calc(var(--port-scale) * 0.16);
   }
 
   /* Counter label ("x kişi yuvaya mektup bıraktı") was colliding with the
@@ -4546,7 +4557,7 @@ dialog::backdrop {
 
   .envelope-garden {
     position: absolute;
-    top: 80%;
+    top: 74%;
     left: 50%;
     width: min(calc(var(--stage-width) * 0.82), 92vw);
     height: calc(var(--stage-width) * 0.052);
@@ -4590,7 +4601,7 @@ dialog::backdrop {
   }
 
   .roaming-cat {
-    width: clamp(42px, 11svh, 62px);
+    width: clamp(52px, 13svh, 76px);
   }
 
   .page-shell {

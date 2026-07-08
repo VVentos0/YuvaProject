@@ -101,6 +101,11 @@ const envelopeLockedDialog = document.querySelector("#envelopeLockedDialog");
 const wishIntroDialog = document.querySelector("#wishIntroDialog");
 const wishFormDialog = document.querySelector("#wishFormDialog");
 const readRoomButton = document.querySelector("#readRoomButton");
+const openLetterModal = document.querySelector("#openLetterModal");
+// /mektup is a quiet side entrance that keeps letter-writing open (site-wide
+// writing is otherwise closed post-archive, see server.js LETTERS_OPEN) —
+// visitors there see the "Mektup Yaz" button instead of "Mektupları Oku".
+const isMektupEntry = /^\/mektup\/?$/i.test(window.location.pathname);
 const closeLetterModal = document.querySelector("#closeLetterModal");
 const closeRibbonDialog = document.querySelector("#closeRibbonDialog");
 const closeStarDialog = document.querySelector("#closeStarDialog");
@@ -1811,6 +1816,11 @@ function bindEvents() {
     showToast("Dileğin gökyüzünde kaldı.");
   });
 
+  if (isMektupEntry) {
+    readRoomButton.hidden = true;
+    openLetterModal.hidden = false;
+  }
+
   readRoomButton.addEventListener("click", (event) => {
     playEffectSound("letterClick");
     const destination = readRoomButton.getAttribute("href") || "/sedoveiro";
@@ -1819,9 +1829,18 @@ function bindEvents() {
       window.location.href = destination;
     });
   });
+  openLetterModal.addEventListener("click", () => {
+    playEffectSound("letterClick");
+    letterFormStartedAt = Date.now();
+    if (letterWebsite) letterWebsite.value = "";
+    letterDialog.showModal();
+    letterBody.focus();
+  });
   if (window.matchMedia("(hover: hover) and (pointer: fine)").matches) {
     readRoomButton.addEventListener("pointerenter", playLetterHoverSound);
     readRoomButton.addEventListener("pointerleave", stopLetterHoverSound);
+    openLetterModal.addEventListener("pointerenter", playLetterHoverSound);
+    openLetterModal.addEventListener("pointerleave", stopLetterHoverSound);
   }
 
   closeLetterModal.addEventListener("click", () => letterDialog.close());
@@ -2312,14 +2331,20 @@ function initRoamingCat() {
   const pointerWorldX = (event) => event.clientX + getSceneViewportOffset();
   const laneY = () => {
     const rect = catSize();
-    // Anchor the cat to the tree base on every aspect ratio. The letter pile
-    // now hugs this same base line, so the cat walks straight across the top
-    // of the pile — by design (it renders above the envelopes), not around it.
-    const treeArea = document.querySelector("#treeHitArea") || document.querySelector(".main-image-area");
+    // Keep the cat in the near foreground BELOW the letter pile (which now
+    // hugs the trunk, higher up) so the enlarged cat never walks in front of
+    // the envelopes. Prefer the real measured pile bottom (accounts for row
+    // count / overflow past the pile's own thin container on every
+    // resolution); fall back to the tree base if envelopes aren't rendered.
     let target = window.innerHeight * config.laneYRatio;
-    if (treeArea) {
-      const base = treeArea.getBoundingClientRect().bottom;
-      if (base > 0) target = base - rect.height * 0.32;
+    if (pileBottomY > 0) {
+      target = pileBottomY + rect.height * 0.4;
+    } else {
+      const treeArea = document.querySelector("#treeHitArea") || document.querySelector(".main-image-area");
+      if (treeArea) {
+        const base = treeArea.getBoundingClientRect().bottom;
+        if (base > 0) target = base + rect.height * 0.12;
+      }
     }
     return Math.max(58, Math.min(window.innerHeight - rect.height - 6, target));
   };
@@ -2699,7 +2724,26 @@ function renderEnvelopeStack(excludedId = "") {
   letters.forEach((letter, index) => {
     envelopeGarden.appendChild(createEnvelopeElement(letter, index));
   });
+
+  updatePileBottomY();
 }
+
+// The rendered envelope pile can visually extend well past its own thin
+// container box (rows overflow via transform/scale), and by how much varies
+// with row count and stage size. Cache the REAL rendered bottom edge here
+// (instead of guessing a fixed offset per breakpoint) so the roaming cat can
+// reliably stay below every letter, on every resolution.
+let pileBottomY = 0;
+function updatePileBottomY() {
+  const envelopes = envelopeGarden.querySelectorAll(".envelope");
+  let maxBottom = -Infinity;
+  envelopes.forEach((envelope) => {
+    const bottom = envelope.getBoundingClientRect().bottom;
+    if (bottom > maxBottom) maxBottom = bottom;
+  });
+  pileBottomY = Number.isFinite(maxBottom) ? maxBottom : 0;
+}
+window.addEventListener("resize", updatePileBottomY);
 
 function dropEnvelope(letter) {
   renderEnvelopeStack(letter.id);
